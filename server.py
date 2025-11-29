@@ -391,16 +391,25 @@ function kv(k,v){
 
 function fmtSession(s){
   const start = s.started_at || '?';
-  const end = s.ended_at || 'ongoing';
-  const energy = (s.session_energy_kwh != null)
-    ? s.session_energy_kwh.toFixed(3) + ' kWh'
-    : ((s.end_amount_kwh != null && s.start_amount_kwh != null)
-        ? (s.end_amount_kwh - s.start_amount_kwh).toFixed(3) + ' kWh'
-        : 'n/a');
-  return `<div class="kv">
+  const ongoing = !s.ended_at;
+  const end = ongoing ? '⚡ ongoing' : s.ended_at;
+
+  // Compute energy: prefer session_energy_kwh, else delta, else live delta for ongoing
+  let energy;
+  if (s.session_energy_kwh != null) {
+    energy = s.session_energy_kwh.toFixed(3) + ' kWh';
+  } else if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
+    energy = (s.end_amount_kwh - s.start_amount_kwh).toFixed(3) + ' kWh';
+  } else {
+    energy = '0.000 kWh';
+  }
+
+  const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
+
+  return `<div class="kv" style="margin-bottom:8px;">
     <div style="flex:1;">
-      <div><b>${energy}</b></div>
-      <div style="font-size:12px;">${start} → ${end}</div>
+      <div><b>${energy}</b> · ${user}${ongoing ? ' 🔌' : ''}</div>
+      <div style="font-size:12px;color:#888;">${start} → ${end}</div>
     </div>
   </div>`;
 }
