@@ -1,27 +1,39 @@
-[
-  {
-    "id": "1732900000-1",
-    "started_at": "2025-11-29T20:00:00Z",
-    "ended_at": "2025-11-29T21:15:00Z",
-    "start_amount_kwh": 100.0,
-    "end_amount_kwh": 107.2,
-    "session_energy_kwh": 7.2,
+{
+  "sessions": [
+    {
+      "id": "1732900000-1",
+      "started_at": "2025-11-29T20:00:00Z",
+      "ended_at": "2025-11-29T21:15:00Z",
+      "start_amount_kwh": 100.0,
+      "end_amount_kwh": 107.2,
+      "session_energy_kwh": 7.2,
+      "meta": {
+        "user": "Lidor"
+      }
+    },
+    {
+      "id": "1732907200-2",
+      "started_at": "2025-11-29T22:00:00Z",
+      "ended_at": "2025-11-29T22:45:00Z",
+      "start_amount_kwh": 107.2,
+      "end_amount_kwh": 110.7,
+      "session_energy_kwh": 3.5,
+      "meta": {
+        "user": "Bar"
+      }
+    }
+  ],
+  "current_session": {
+    "id": "1732910000-3",
+    "started_at": "2025-11-29T23:04:52Z",
+    "ended_at": null,
+    "start_amount_kwh": 1137.2,
+    "end_amount_kwh": 1138.4,
     "meta": {
       "user": "Lidor"
     }
-  },
-  {
-    "id": "1732907200-2",
-    "started_at": "2025-11-29T22:00:00Z",
-    "ended_at": "2025-11-29T22:45:00Z",
-    "start_amount_kwh": 107.2,
-    "end_amount_kwh": 110.7,
-    "session_energy_kwh": 3.5,
-    "meta": {
-      "user": "Bar"
-    }
   }
-]
+}
 
 
 
