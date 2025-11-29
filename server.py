@@ -1,9 +1,12 @@
-import subprocess
-import threading
 import json
 import os
+import subprocess
+import threading
+import time
+from datetime import datetime
+
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from paho.mqtt import client as mqtt
 
 SERIAL = "0166341352572539"
@@ -13,24 +16,143 @@ BASE = f"evseMQTT/{SERIAL}"
 # evseMQTT doesn't document payloads clearly; so we make them configurable.
 CMD_TOPIC = os.getenv("CMD_TOPIC", f"{BASE}/command")
 START_PAYLOAD = '{"charge_state": 1}'
-STOP_PAYLOAD  = '{"charge_state": 0}'
+STOP_PAYLOAD = '{"charge_state": 0}'
 # Template: use {amps} placeholder
 AMPS_PAYLOAD_TEMPLATE = '{"charge_amps": {amps}}'
-
 
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
+# ---- Session logging config ----
+SESSIONS_FILE = os.getenv("SESSIONS_FILE", "sessions.json")
+MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "500"))
+
 app = FastAPI()
 
-latest_charge = {}
-latest_config = {}
-availability = "unknown"
+latest_charge: dict = {}
+latest_config: dict = {}
+availability: str = "unknown"
+
+# Very small in‑memory session store, persisted to JSON.
+sessions: list[dict] = []
+current_session: dict | None = None
+_sessions_lock = threading.Lock()
+
+
+def _utc_iso() -> str:
+    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+
+def _load_sessions():
+    global sessions
+    if not os.path.exists(SESSIONS_FILE):
+        sessions = []
+        return
+    try:
+        with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            sessions = data
+        else:
+            sessions = []
+    except Exception:
+        sessions = []
+
+
+def _save_sessions():
+    # Called from MQTT thread; keep it simple and safe.
+    try:
+        tmp = SESSIONS_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(sessions[-MAX_SESSIONS:], f, ensure_ascii=False, indent=2)
+        os.replace(tmp, SESSIONS_FILE)
+    except Exception:
+        # If disk write fails, don't crash the bridge.
+        pass
+
+
+def _update_sessions_from_charge(charge: dict):
+    """
+    Very simple heuristic:
+      - Treat a session as 'active' while current_energy > 0.
+      - When it goes back to 0 (or None) after being active, close the session.
+    We can refine this later once we see real payloads.
+    """
+    global current_session, sessions
+
+    ts = _utc_iso()
+    energy = charge.get("current_energy")
+    total = charge.get("total_energy")
+
+    # Normalize numeric values if they come in as strings
+    try:
+        energy_val = float(energy) if energy is not None else None
+    except (TypeError, ValueError):
+        energy_val = None
+    try:
+        total_val = float(total) if total is not None else None
+    except (TypeError, ValueError):
+        total_val = None
+
+    is_active = energy_val is not None and energy_val > 0
+
+    with _sessions_lock:
+        if current_session is None and is_active:
+            # Start of a new session
+            session_id = f"{int(time.time())}-{len(sessions)+1}"
+            current_session = {
+                "id": session_id,
+                "started_at": ts,
+                "ended_at": None,
+                "start_energy_kwh": energy_val,
+                "end_energy_kwh": None,
+                "start_total_kwh": total_val,
+                "end_total_kwh": None,
+                "meta": {
+                    "plug_state": charge.get("plug_state"),
+                    "output_state": charge.get("output_state"),
+                    "current_state": charge.get("current_state"),
+                },
+            }
+        elif current_session is not None and not is_active:
+            # End of an existing session
+            current_session["ended_at"] = ts
+            current_session["end_energy_kwh"] = energy_val
+            current_session["end_total_kwh"] = total_val
+
+            # Best‑effort session_energy_kwh
+            session_energy = None
+            if (
+                current_session.get("start_total_kwh") is not None
+                and total_val is not None
+            ):
+                session_energy = max(
+                    0.0, total_val - current_session["start_total_kwh"]
+                )
+            elif (
+                current_session.get("start_energy_kwh") is not None
+                and energy_val is not None
+            ):
+                session_energy = max(
+                    0.0, energy_val - current_session["start_energy_kwh"]
+                )
+
+            current_session["session_energy_kwh"] = session_energy
+
+            sessions.append(current_session)
+            current_session = None
+            _save_sessions()
+        elif current_session is not None and is_active:
+            # Update rolling values while charging
+            current_session["end_energy_kwh"] = energy_val
+            current_session["end_total_kwh"] = total_val
+
 
 def on_connect(client, userdata, flags, rc):
     client.subscribe(f"{BASE}/availability")
     client.subscribe(f"{BASE}/state/charge")
     client.subscribe(f"{BASE}/state/config")
+
 
 def on_message(client, userdata, msg):
     global latest_charge, latest_config, availability
@@ -42,13 +164,17 @@ def on_message(client, userdata, msg):
     elif topic.endswith("/state/charge"):
         try:
             latest_charge = json.loads(payload)
-        except:
+        except Exception:
             latest_charge = {"raw": payload}
+        _update_sessions_from_charge(latest_charge)
     elif topic.endswith("/state/config"):
         try:
             latest_config = json.loads(payload)
-        except:
+        except Exception:
             latest_config = {"raw": payload}
+
+
+_load_sessions()
 
 mqttc = mqtt.Client()
 mqttc.on_connect = on_connect
@@ -56,8 +182,10 @@ mqttc.on_message = on_message
 mqttc.connect(MQTT_HOST, MQTT_PORT, 60)
 mqttc.loop_start()
 
+
 def publish(payload: str):
     mqttc.publish(CMD_TOPIC, payload)
+
 
 @app.get("/api/state")
 def api_state():
@@ -67,6 +195,14 @@ def api_state():
         "config": latest_config,
         "cmd_topic": CMD_TOPIC,
     }
+
+
+@app.get("/api/sessions")
+def api_sessions():
+    # Return newest first
+    with _sessions_lock:
+        return {"sessions": list(reversed(sessions[-MAX_SESSIONS:]))}
+
 
 def pause_ble_for(seconds: int):
     # stop bridge
@@ -80,27 +216,32 @@ def pause_ble_for(seconds: int):
     t.daemon = True
     t.start()
 
+
 @app.post("/api/pause_ble/{seconds}")
 def api_pause_ble(seconds: int):
     seconds = max(5, min(seconds, 600))  # clamp 5s..10min for safety
     pause_ble_for(seconds)
     return {"ok": True, "paused_for": seconds}
 
+
 @app.post("/api/start")
 def api_start():
     publish(START_PAYLOAD)
     return {"ok": True}
+
 
 @app.post("/api/stop")
 def api_stop():
     publish(STOP_PAYLOAD)
     return {"ok": True}
 
+
 @app.post("/api/amps/{amps}")
 def api_amps(amps: int):
     payload = json.dumps({"charge_amps": amps})
     publish(payload)
     return {"ok": True, "amps": amps}
+
 
 @app.get("/")
 def ui():
@@ -160,6 +301,11 @@ def ui():
     <div class="grid" id="telemetry"></div>
   </div>
 
+  <div class="card">
+    <div class="big">History (last 10 sessions)</div>
+    <div id="history" class="muted">No sessions yet.</div>
+  </div>
+
 <script>
 let isDragging = false;
 let debounceTimer = null;
@@ -200,6 +346,40 @@ async function setAmps(){
 
 function kv(k,v){
   return `<div class="kv"><div>${k}</div><div><b>${v}</b></div></div>`;
+}
+
+function fmtSession(s){
+  const start = s.started_at || '?';
+  const end = s.ended_at || 'ongoing';
+  const energy = (s.session_energy_kwh != null)
+    ? s.session_energy_kwh.toFixed(3) + ' kWh'
+    : ((s.end_total_kwh != null && s.start_total_kwh != null)
+        ? (s.end_total_kwh - s.start_total_kwh).toFixed(3) + ' kWh'
+        : 'n/a');
+  return `<div class="kv">
+    <div style="flex:1;">
+      <div><b>${energy}</b></div>
+      <div style="font-size:12px;">${start} → ${end}</div>
+    </div>
+  </div>`;
+}
+
+async function loadSessions(){
+  try{
+    const r = await fetch('/api/sessions');
+    if (!r.ok) return;
+    const data = await r.json();
+    const list = data.sessions || [];
+    const el = document.getElementById('history');
+    if (!list.length){
+      el.innerText = 'No sessions yet.';
+      return;
+    }
+    const recent = list.slice(0, 10);
+    el.innerHTML = recent.map(fmtSession).join('');
+  }catch(e){
+    // ignore
+  }
 }
 
 async function load(){
@@ -276,7 +456,9 @@ ampsEl.addEventListener('input', (e) => {
 });
 
 load();
+loadSessions();
 setInterval(load, 2000);
+setInterval(loadSessions, 15000);
 </script>
 
 </body>
