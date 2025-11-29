@@ -15,7 +15,6 @@ BASE = f"evseMQTT/{SERIAL}"
 # ---- Command topic + payloads ----
 # evseMQTT doesn't document payloads clearly; so we make them configurable.
 CMD_TOPIC = os.getenv("CMD_TOPIC", f"{BASE}/command")
-START_PAYLOAD = '{"charge_state": 1}'
 STOP_PAYLOAD = '{"charge_state": 0}'
 # Template: use {amps} placeholder
 AMPS_PAYLOAD_TEMPLATE = '{"charge_amps": {amps}}'
@@ -226,8 +225,11 @@ def api_pause_ble(seconds: int):
 
 @app.post("/api/start")
 def api_start():
-    publish(START_PAYLOAD)
-    return {"ok": True}
+    # use last known amps from config; fallback to 16
+    amps = latest_config.get("charge_amps") or 16
+    payload = json.dumps({"charge_state": 1, "charge_amps": int(amps)})
+    publish(payload)
+    return {"ok": True, "amps": amps}
 
 
 @app.post("/api/stop")
