@@ -389,10 +389,27 @@ function kv(k,v){
   return `<div class="kv"><div>${k}</div><div><b>${v}</b></div></div>`;
 }
 
+function fmtDate(isoStr){
+  if (!isoStr) return '?';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleString('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch(e) {
+    return isoStr;
+  }
+}
+
 function fmtSession(s){
-  const start = s.started_at || '?';
+  const start = fmtDate(s.started_at);
   const ongoing = !s.ended_at;
-  const end = ongoing ? '⚡ ongoing' : s.ended_at;
+  const end = ongoing ? '⚡ ongoing' : fmtDate(s.ended_at);
 
   // Compute energy: prefer session_energy_kwh, else delta, else live delta for ongoing
   let energy;
