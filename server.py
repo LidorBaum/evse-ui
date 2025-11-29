@@ -405,6 +405,7 @@ let lockUntilTs = 0;  // timestamp ms until which we don't overwrite slider
 
 let clockSettings = { clock_start: '07:00', clock_end: '23:00' };
 let isCharging = false;
+let hasData = false;  // true once we receive first MQTT data
 
 function currentUser(){
   const sel = document.getElementById('userSelect');
@@ -422,32 +423,29 @@ function isWithinClockHours(){
   const startMinutes = startH * 60 + startM;
   const endMinutes = endH * 60 + endM;
 
-  let result;
   if (startMinutes <= endMinutes) {
     // Normal range (e.g. 07:00 - 23:00)
-    result = currentMinutes >= startMinutes && currentMinutes < endMinutes;
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
   } else {
     // Overnight range (e.g. 23:00 - 07:00)
-    result = currentMinutes >= startMinutes || currentMinutes < endMinutes;
+    return currentMinutes >= startMinutes || currentMinutes < endMinutes;
   }
-
-  console.log('Clock check:', {
-    clockSettings,
-    jerusalemTime: jerusalemTime.toLocaleTimeString(),
-    currentMinutes,
-    startMinutes,
-    endMinutes,
-    overnight: startMinutes > endMinutes,
-    withinClock: result
-  });
-
-  return result;
 }
 
 function renderControlButtons(){
   const container = document.getElementById('controlButtons');
   const note = document.getElementById('clockModeNote');
   const withinClock = isWithinClockHours();
+
+  if (!hasData) {
+    // No data yet – show disabled buttons
+    container.innerHTML = `
+      <button class="start" disabled style="opacity:0.5;cursor:not-allowed;">Start</button>
+      <button class="stop" disabled style="opacity:0.5;cursor:not-allowed;">Stop</button>
+    `;
+    note.innerText = '⏳ Waiting for charger data...';
+    return;
+  }
 
   if (withinClock) {
     // Clock mode: single toggle button (Stop toggles both)
@@ -617,8 +615,11 @@ async function load(){
 
   // Track charging state for toggle button
   const wasCharging = isCharging;
+  const hadData = hasData;
   isCharging = (ch.output_state === 'Charging');
-  if (wasCharging !== isCharging) {
+  hasData = Object.keys(ch).length > 0;  // We have data if charge object is not empty
+
+  if (wasCharging !== isCharging || hadData !== hasData) {
     renderControlButtons();
   }
 
