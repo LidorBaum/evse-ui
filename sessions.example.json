@@ -1,0 +1,40 @@
+[
+  {
+    "id": "1732900000-1",
+    "started_at": "2025-11-29T20:00:00Z",
+    "ended_at": "2025-11-29T21:15:00Z",
+    "start_energy_kwh": 0.0,
+    "end_energy_kwh": 7.2,
+    "start_total_kwh": 100.0,
+    "end_total_kwh": 107.2,
+    "start_amount_counter": 100.0,
+    "end_amount_counter": 107.2,
+    "session_energy_kwh": 7.2,
+    "meta": {
+      "plug_state": "Connected Locked",
+      "output_state": "Charging",
+      "current_state": "Completed",
+      "user": "Lidor"
+    }
+  },
+  {
+    "id": "1732907200-2",
+    "started_at": "2025-11-29T22:00:00Z",
+    "ended_at": "2025-11-29T22:45:00Z",
+    "start_energy_kwh": 0.0,
+    "end_energy_kwh": 3.5,
+    "start_total_kwh": 107.2,
+    "end_total_kwh": 110.7,
+    "start_amount_counter": 107.2,
+    "end_amount_counter": 110.7,
+    "session_energy_kwh": 3.5,
+    "meta": {
+      "plug_state": "Connected Locked",
+      "output_state": "Charging",
+      "current_state": "Completed",
+      "user": "Bar"
+    }
+  }
+]
+
+

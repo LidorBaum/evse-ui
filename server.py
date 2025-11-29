@@ -31,6 +31,7 @@ app = FastAPI()
 latest_charge: dict = {}
 latest_config: dict = {}
 availability: str = "unknown"
+last_start_user: str | None = None
 
 # Very small in‑memory session store, persisted to JSON.
 sessions: list[dict] = []
@@ -43,27 +44,42 @@ def _utc_iso() -> str:
 
 
 def _load_sessions():
-    global sessions
+    global sessions, current_session
     if not os.path.exists(SESSIONS_FILE):
         sessions = []
+        current_session = None
         return
     try:
         with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
+        # Backwards‑compat:
+        #  - old format: plain list of sessions
+        #  - new format: {"sessions": [...], "current_session": {...}}
         if isinstance(data, list):
             sessions = data
+            current_session = None
+        elif isinstance(data, dict):
+            sessions = data.get("sessions") or []
+            cs = data.get("current_session")
+            current_session = cs if isinstance(cs, dict) else None
         else:
             sessions = []
+            current_session = None
     except Exception:
         sessions = []
+        current_session = None
 
 
 def _save_sessions():
     # Called from MQTT thread; keep it simple and safe.
     try:
         tmp = SESSIONS_FILE + ".tmp"
+        payload = {
+            "sessions": sessions[-MAX_SESSIONS:],
+            "current_session": current_session,
+        }
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(sessions[-MAX_SESSIONS:], f, ensure_ascii=False, indent=2)
+            json.dump(payload, f, ensure_ascii=False, indent=2)
         os.replace(tmp, SESSIONS_FILE)
     except Exception:
         # If disk write fails, don't crash the bridge.
@@ -82,6 +98,7 @@ def _update_sessions_from_charge(charge: dict):
     ts = _utc_iso()
     energy = charge.get("current_energy")
     total = charge.get("total_energy")
+    amount = charge.get("current_amount")  # monotonically increasing counter
 
     # Normalize numeric values if they come in as strings
     try:
@@ -92,7 +109,12 @@ def _update_sessions_from_charge(charge: dict):
         total_val = float(total) if total is not None else None
     except (TypeError, ValueError):
         total_val = None
+    try:
+        amount_val = float(amount) if amount is not None else None
+    except (TypeError, ValueError):
+        amount_val = None
 
+    # Keep the simple "energy > 0" heuristic for active session for now.
     is_active = energy_val is not None and energy_val > 0
 
     with _sessions_lock:
@@ -107,21 +129,33 @@ def _update_sessions_from_charge(charge: dict):
                 "end_energy_kwh": None,
                 "start_total_kwh": total_val,
                 "end_total_kwh": None,
+                "start_amount_counter": amount_val,
+                "end_amount_counter": None,
                 "meta": {
                     "plug_state": charge.get("plug_state"),
                     "output_state": charge.get("output_state"),
                     "current_state": charge.get("current_state"),
+                    "user": last_start_user or "Unknown",
                 },
             }
+            _save_sessions()
         elif current_session is not None and not is_active:
             # End of an existing session
             current_session["ended_at"] = ts
             current_session["end_energy_kwh"] = energy_val
             current_session["end_total_kwh"] = total_val
+            current_session["end_amount_counter"] = amount_val
 
-            # Best‑effort session_energy_kwh
+            # Best‑effort session_energy_kwh (prefer the monotonic amount counter)
             session_energy = None
             if (
+                current_session.get("start_amount_counter") is not None
+                and amount_val is not None
+            ):
+                session_energy = max(
+                    0.0, amount_val - current_session["start_amount_counter"]
+                )
+            elif (
                 current_session.get("start_total_kwh") is not None
                 and total_val is not None
             ):
@@ -145,6 +179,8 @@ def _update_sessions_from_charge(charge: dict):
             # Update rolling values while charging
             current_session["end_energy_kwh"] = energy_val
             current_session["end_total_kwh"] = total_val
+            current_session["end_amount_counter"] = amount_val
+            _save_sessions()
 
 
 def on_connect(client, userdata, flags, rc):
@@ -225,11 +261,20 @@ def api_pause_ble(seconds: int):
 
 @app.post("/api/start")
 def api_start():
+    # Backwards‑compat: start without explicit user (records as "Unknown")
+    return api_start_for("Unknown")
+
+
+@app.post("/api/start_for/{user}")
+def api_start_for(user: str):
+    global last_start_user
+    last_start_user = user
+
     # use last known amps from config; fallback to 16
     amps = latest_config.get("charge_amps") or 16
     payload = json.dumps({"charge_state": 1, "charge_amps": int(amps)})
     publish(payload)
-    return {"ok": True, "amps": amps}
+    return {"ok": True, "amps": amps, "user": user}
 
 
 @app.post("/api/stop")
@@ -271,8 +316,17 @@ def ui():
   <h2>BS20 Charger</h2>
 
   <div class="card">
+    <div class="big">User</div>
+    <select id="userSelect" style="margin-top:8px; padding:8px; border-radius:8px; width:100%; font-size:16px;">
+      <option value="Lidor">Lidor</option>
+      <option value="Bar">Bar</option>
+    </select>
+    <div class="muted" style="margin-top:6px;">Selected user will be attached to new sessions.</div>
+  </div>
+
+  <div class="card">
     <div class="row">
-      <button class="start" onclick="post('/api/start')">Start</button>
+      <button class="start" onclick="startWithUser()">Start</button>
       <button class="stop" onclick="post('/api/stop')">Stop</button>
     </div>
   </div>
@@ -316,6 +370,11 @@ let debounceTimer = null;
 let pendingAmps = null;
 let lockUntilTs = 0;  // timestamp ms until which we don't overwrite slider
 
+function currentUser(){
+  const sel = document.getElementById('userSelect');
+  return sel ? sel.value : 'Unknown';
+}
+
 async function post(url){
   try{
     const r = await fetch(url, {method:'POST'});
@@ -324,6 +383,11 @@ async function post(url){
   }catch(e){
     return false;
   }
+}
+
+async function startWithUser(){
+  const user = encodeURIComponent(currentUser());
+  await post('/api/start_for/' + user);
 }
 
 async function pauseBle(sec){
