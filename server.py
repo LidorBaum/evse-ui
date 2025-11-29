@@ -26,6 +26,39 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 SESSIONS_FILE = os.getenv("SESSIONS_FILE", "sessions.json")
 MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "500"))
 
+# ---- Settings config ----
+SETTINGS_FILE = os.getenv("SETTINGS_FILE", "settings.json")
+
+def _load_settings() -> dict:
+    defaults = {
+        "clock_start": "07:00",
+        "clock_end": "23:00",
+        "users": ["Lidor", "Bar"],
+    }
+    if not os.path.exists(SETTINGS_FILE):
+        return defaults
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # Merge with defaults for any missing keys
+        for k, v in defaults.items():
+            if k not in data:
+                data[k] = v
+        return data
+    except Exception:
+        return defaults
+
+def _save_settings(settings: dict):
+    try:
+        tmp = SETTINGS_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(settings, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, SETTINGS_FILE)
+    except Exception:
+        pass
+
+app_settings: dict = _load_settings()
+
 app = FastAPI()
 
 latest_charge: dict = {}
@@ -218,6 +251,25 @@ def api_sessions():
         return {"sessions": list(reversed(items))}
 
 
+@app.get("/api/settings")
+def api_get_settings():
+    return app_settings
+
+
+@app.post("/api/settings")
+def api_post_settings(new_settings: dict):
+    global app_settings
+    # Update only known keys
+    if "clock_start" in new_settings:
+        app_settings["clock_start"] = new_settings["clock_start"]
+    if "clock_end" in new_settings:
+        app_settings["clock_end"] = new_settings["clock_end"]
+    if "users" in new_settings and isinstance(new_settings["users"], list):
+        app_settings["users"] = new_settings["users"]
+    _save_settings(app_settings)
+    return {"ok": True, "settings": app_settings}
+
+
 def pause_ble_for(seconds: int):
     # stop bridge
     subprocess.run(["sudo", "systemctl", "stop", "evseMQTT"], check=False)
@@ -292,13 +344,14 @@ def ui():
   </style>
 </head>
 <body>
-  <h2>BS20 Charger</h2>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h2 style="margin:0;">BS20 Charger</h2>
+    <a href="/settings" style="font-size:24px; text-decoration:none;">⚙️</a>
+  </div>
 
-  <div class="card">
+  <div class="card" style="margin-top:12px;">
     <div class="big">User</div>
     <select id="userSelect" style="margin-top:8px; padding:8px; border-radius:8px; width:100%; font-size:16px;">
-      <option value="Lidor">Lidor</option>
-      <option value="Bar">Bar</option>
     </select>
     <div class="muted" style="margin-top:6px;">Selected user will be attached to new sessions.</div>
   </div>
@@ -482,7 +535,7 @@ async function load(){
   updateLastUpdateDisplay();
 
   document.getElementById('availability').innerText =
-    "Bridge: " + data.availability;
+    "BLE Bridge: " + (data.availability === 'online' ? 'Connected ✅' : 'Disconnected ❌');
 
   const ch = data.charge || {};
   const cfg = data.config || {};
@@ -546,10 +599,121 @@ ampsEl.addEventListener('input', (e) => {
   debounceTimer = setTimeout(setAmps, 600); // debounce during drag
 });
 
+async function loadUsers(){
+  try {
+    const r = await fetch('/api/settings');
+    if (!r.ok) return;
+    const settings = await r.json();
+    const users = settings.users || ['Lidor', 'Bar'];
+    const sel = document.getElementById('userSelect');
+    sel.innerHTML = users.map(u => `<option value="${u}">${u}</option>`).join('');
+  } catch(e) {}
+}
+
+loadUsers();
 load();
 loadSessions();
 setInterval(load, 2000);
 setInterval(loadSessions, 15000);
+</script>
+
+</body>
+</html>
+"""
+    return HTMLResponse(html)
+
+
+@app.get("/settings")
+def settings_page():
+    html = """
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BS20 Settings</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 16px; }
+    .card { padding: 14px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 12px; }
+    .muted { color:#666; font-size:14px; }
+    .big { font-size:20px; font-weight:600; }
+    input, select { padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px; width:100%; box-sizing:border-box; margin-top:8px; }
+    button { padding:14px 24px; font-size:16px; border-radius:12px; border:0; background:#1db954; color:white; cursor:pointer; margin-top:12px; }
+    button:hover { background:#18a349; }
+    .row { display:flex; gap:10px; align-items:center; }
+  </style>
+</head>
+<body>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h2 style="margin:0;">⚙️ Settings</h2>
+    <a href="/" style="font-size:16px;">← Back</a>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    <div class="big">Clock Hours</div>
+    <div class="muted">Charging schedule window (used by charger timer feature)</div>
+    <div class="row" style="margin-top:12px;">
+      <div style="flex:1;">
+        <label class="muted">Start</label>
+        <input type="time" id="clockStart" />
+      </div>
+      <div style="flex:1;">
+        <label class="muted">End</label>
+        <input type="time" id="clockEnd" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="big">Users</div>
+    <div class="muted">Comma-separated list of user names for the dropdown</div>
+    <input type="text" id="usersList" placeholder="Lidor, Bar" />
+  </div>
+
+  <button onclick="saveSettings()">Save Settings</button>
+  <div id="status" class="muted" style="margin-top:12px;"></div>
+
+<script>
+async function loadSettings(){
+  try {
+    const r = await fetch('/api/settings');
+    if (!r.ok) return;
+    const s = await r.json();
+    document.getElementById('clockStart').value = s.clock_start || '06:00';
+    document.getElementById('clockEnd').value = s.clock_end || '23:00';
+    document.getElementById('usersList').value = (s.users || []).join(', ');
+  } catch(e) {}
+}
+
+async function saveSettings(){
+  const clockStart = document.getElementById('clockStart').value;
+  const clockEnd = document.getElementById('clockEnd').value;
+  const usersRaw = document.getElementById('usersList').value;
+  const users = usersRaw.split(',').map(u => u.trim()).filter(u => u.length > 0);
+
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        clock_start: clockStart,
+        clock_end: clockEnd,
+        users: users
+      })
+    });
+    if (r.ok) {
+      document.getElementById('status').innerText = '✅ Settings saved!';
+      document.getElementById('status').style.color = '#1db954';
+    } else {
+      document.getElementById('status').innerText = '❌ Failed to save';
+      document.getElementById('status').style.color = '#ff4d4f';
+    }
+  } catch(e) {
+    document.getElementById('status').innerText = '❌ Error: ' + e.message;
+    document.getElementById('status').style.color = '#ff4d4f';
+  }
+}
+
+loadSettings();
 </script>
 
 </body>
