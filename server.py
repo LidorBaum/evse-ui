@@ -422,7 +422,14 @@ function isWithinClockHours(){
   const startMinutes = startH * 60 + startM;
   const endMinutes = endH * 60 + endM;
 
-  const result = currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  let result;
+  if (startMinutes <= endMinutes) {
+    // Normal range (e.g. 07:00 - 23:00)
+    result = currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  } else {
+    // Overnight range (e.g. 23:00 - 07:00)
+    result = currentMinutes >= startMinutes || currentMinutes < endMinutes;
+  }
 
   console.log('Clock check:', {
     clockSettings,
@@ -430,6 +437,7 @@ function isWithinClockHours(){
     currentMinutes,
     startMinutes,
     endMinutes,
+    overnight: startMinutes > endMinutes,
     withinClock: result
   });
 
