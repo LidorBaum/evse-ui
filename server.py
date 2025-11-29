@@ -422,7 +422,18 @@ function isWithinClockHours(){
   const startMinutes = startH * 60 + startM;
   const endMinutes = endH * 60 + endM;
 
-  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  const result = currentMinutes >= startMinutes && currentMinutes < endMinutes;
+
+  console.log('Clock check:', {
+    clockSettings,
+    jerusalemTime: jerusalemTime.toLocaleTimeString(),
+    currentMinutes,
+    startMinutes,
+    endMinutes,
+    withinClock: result
+  });
+
+  return result;
 }
 
 function renderControlButtons(){
