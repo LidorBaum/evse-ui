@@ -97,7 +97,6 @@ def _update_sessions_from_charge(charge: dict):
 
     ts = _utc_iso()
     energy = charge.get("current_energy")
-    total = charge.get("total_energy")
     amount = charge.get("current_amount")  # monotonically increasing counter
 
     # Normalize numeric values if they come in as strings
@@ -105,10 +104,6 @@ def _update_sessions_from_charge(charge: dict):
         energy_val = float(energy) if energy is not None else None
     except (TypeError, ValueError):
         energy_val = None
-    try:
-        total_val = float(total) if total is not None else None
-    except (TypeError, ValueError):
-        total_val = None
     try:
         amount_val = float(amount) if amount is not None else None
     except (TypeError, ValueError):
@@ -125,12 +120,10 @@ def _update_sessions_from_charge(charge: dict):
                 "id": session_id,
                 "started_at": ts,
                 "ended_at": None,
-                "start_energy_kwh": energy_val,
-                "end_energy_kwh": None,
-                "start_total_kwh": total_val,
-                "end_total_kwh": None,
-                "start_amount_counter": amount_val,
-                "end_amount_counter": None,
+                # energy accounting based solely on the monotonic amount counter
+                "start_amount_kwh": amount_val,
+                "end_amount_kwh": amount_val,
+                "session_energy_kwh": None,
                 "meta": {
                     "plug_state": charge.get("plug_state"),
                     "output_state": charge.get("output_state"),
@@ -142,44 +135,23 @@ def _update_sessions_from_charge(charge: dict):
         elif current_session is not None and not is_active:
             # End of an existing session
             current_session["ended_at"] = ts
-            current_session["end_energy_kwh"] = energy_val
-            current_session["end_total_kwh"] = total_val
-            current_session["end_amount_counter"] = amount_val
+            current_session["end_amount_kwh"] = amount_val
 
-            # Best‑effort session_energy_kwh (prefer the monotonic amount counter)
-            session_energy = None
-            if (
-                current_session.get("start_amount_counter") is not None
-                and amount_val is not None
-            ):
-                session_energy = max(
-                    0.0, amount_val - current_session["start_amount_counter"]
+            # Session energy purely from the amount counter
+            start_amt = current_session.get("start_amount_kwh")
+            if start_amt is not None and amount_val is not None:
+                current_session["session_energy_kwh"] = max(
+                    0.0, amount_val - start_amt
                 )
-            elif (
-                current_session.get("start_total_kwh") is not None
-                and total_val is not None
-            ):
-                session_energy = max(
-                    0.0, total_val - current_session["start_total_kwh"]
-                )
-            elif (
-                current_session.get("start_energy_kwh") is not None
-                and energy_val is not None
-            ):
-                session_energy = max(
-                    0.0, energy_val - current_session["start_energy_kwh"]
-                )
-
-            current_session["session_energy_kwh"] = session_energy
+            else:
+                current_session["session_energy_kwh"] = None
 
             sessions.append(current_session)
             current_session = None
             _save_sessions()
         elif current_session is not None and is_active:
             # Update rolling values while charging
-            current_session["end_energy_kwh"] = energy_val
-            current_session["end_total_kwh"] = total_val
-            current_session["end_amount_counter"] = amount_val
+            current_session["end_amount_kwh"] = amount_val
             _save_sessions()
 
 
@@ -422,8 +394,8 @@ function fmtSession(s){
   const end = s.ended_at || 'ongoing';
   const energy = (s.session_energy_kwh != null)
     ? s.session_energy_kwh.toFixed(3) + ' kWh'
-    : ((s.end_total_kwh != null && s.start_total_kwh != null)
-        ? (s.end_total_kwh - s.start_total_kwh).toFixed(3) + ' kWh'
+    : ((s.end_amount_kwh != null && s.start_amount_kwh != null)
+        ? (s.end_amount_kwh - s.start_amount_kwh).toFixed(3) + ' kWh'
         : 'n/a');
   return `<div class="kv">
     <div style="flex:1;">
