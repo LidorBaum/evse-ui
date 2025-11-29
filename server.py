@@ -234,9 +234,12 @@ def api_state():
 
 @app.get("/api/sessions")
 def api_sessions():
-    # Return newest first
+    # Return newest first; include current in‑progress session if present
     with _sessions_lock:
-        return {"sessions": list(reversed(sessions[-MAX_SESSIONS:]))}
+        items = sessions[-MAX_SESSIONS:]
+        if current_session is not None:
+            items = items + [current_session]
+        return {"sessions": list(reversed(items))}
 
 
 def pause_ble_for(seconds: int):
