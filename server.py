@@ -493,8 +493,7 @@ async function load(){
   t.push(kv("L2 A", ch.l2_amperage ?? '-'));
   t.push(kv("L3 V", ch.l3_voltage ?? '-'));
   t.push(kv("L3 A", ch.l3_amperage ?? '-'));
-  t.push(kv("Session kWh", ch.current_energy ?? '-'));
-  t.push(kv("Total kWh", ch.total_energy ?? '-'));
+  t.push(kv("Charging Rate", ch.total_energy != null ? ch.total_energy + ' kW' : '-'));
   t.push(kv("Inner °C", ch.inner_temp_c ?? '-'));
   t.push(kv("RSSI", cfg.rssi ?? '-'));
   document.getElementById('telemetry').innerHTML = t.join('');
