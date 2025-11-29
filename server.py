@@ -32,6 +32,7 @@ latest_charge: dict = {}
 latest_config: dict = {}
 availability: str = "unknown"
 last_start_user: str | None = None
+last_mqtt_update: float = 0.0  # timestamp of last MQTT message received
 
 # Very small in‑memory session store, persisted to JSON.
 sessions: list[dict] = []
@@ -162,9 +163,11 @@ def on_connect(client, userdata, flags, rc):
 
 
 def on_message(client, userdata, msg):
-    global latest_charge, latest_config, availability
+    global latest_charge, latest_config, availability, last_mqtt_update
     topic = msg.topic
     payload = msg.payload.decode(errors="ignore")
+
+    last_mqtt_update = time.time()
 
     if topic.endswith("/availability"):
         availability = payload.strip()
@@ -201,6 +204,7 @@ def api_state():
         "charge": latest_charge,
         "config": latest_config,
         "cmd_topic": CMD_TOPIC,
+        "last_update": last_mqtt_update,
     }
 
 
@@ -324,6 +328,7 @@ def ui():
   <div class="card">
     <div class="big">Status</div>
     <div class="muted" id="availability">...</div>
+    <div class="muted" id="lastUpdate" style="margin-top:4px;">Last update: -</div>
     <div id="statusText"></div>
   </div>
 
@@ -449,12 +454,32 @@ async function loadSessions(){
   }
 }
 
+let lastUpdateTs = 0;
+
+function updateLastUpdateDisplay(){
+  const el = document.getElementById('lastUpdate');
+  if (!lastUpdateTs) {
+    el.innerText = 'Last update: -';
+    el.style.color = '#666';
+    return;
+  }
+  const agoSec = Math.round((Date.now() / 1000) - lastUpdateTs);
+  const stale = agoSec > 30;
+  el.innerText = 'Last update: ' + agoSec + 's ago';
+  el.style.color = stale ? '#ff4d4f' : '#1db954';
+}
+
+setInterval(updateLastUpdateDisplay, 1000);
+
 async function load(){
-  // don’t fight user while dragging
+  // don't fight user while dragging
   if (isDragging) return;
 
   const r = await fetch('/api/state');
   const data = await r.json();
+
+  lastUpdateTs = data.last_update || 0;
+  updateLastUpdateDisplay();
 
   document.getElementById('availability').innerText =
     "Bridge: " + data.availability;
