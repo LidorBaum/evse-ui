@@ -356,11 +356,11 @@ def ui():
     <div class="muted" style="margin-top:6px;">Selected user will be attached to new sessions.</div>
   </div>
 
-  <div class="card">
-    <div class="row">
-      <button class="start" onclick="startWithUser()">Start</button>
-      <button class="stop" onclick="post('/api/stop')">Stop</button>
+  <div class="card" id="controlCard">
+    <div class="row" id="controlButtons">
+      <!-- Buttons rendered by JS based on clock hours -->
     </div>
+    <div class="muted" id="clockModeNote" style="margin-top:8px;"></div>
   </div>
   <div class="card">
     <div class="big">Bluetooth Control</div>
@@ -403,9 +403,47 @@ let debounceTimer = null;
 let pendingAmps = null;
 let lockUntilTs = 0;  // timestamp ms until which we don't overwrite slider
 
+let clockSettings = { clock_start: '07:00', clock_end: '23:00' };
+let isCharging = false;
+
 function currentUser(){
   const sel = document.getElementById('userSelect');
   return sel ? sel.value : 'Unknown';
+}
+
+function isWithinClockHours(){
+  // Get current time in Jerusalem
+  const now = new Date();
+  const jerusalemTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+  const currentMinutes = jerusalemTime.getHours() * 60 + jerusalemTime.getMinutes();
+
+  const [startH, startM] = clockSettings.clock_start.split(':').map(Number);
+  const [endH, endM] = clockSettings.clock_end.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+}
+
+function renderControlButtons(){
+  const container = document.getElementById('controlButtons');
+  const note = document.getElementById('clockModeNote');
+  const withinClock = isWithinClockHours();
+
+  if (withinClock) {
+    // Clock mode: single toggle button (Stop toggles both)
+    const label = isCharging ? 'Stop ⏹️' : 'Start ▶️';
+    const cls = isCharging ? 'stop' : 'start';
+    container.innerHTML = `<button class="${cls}" onclick="post('/api/stop')" style="width:100%;">${label}</button>`;
+    note.innerText = '🕐 Clock mode active – toggle charging with one button';
+  } else {
+    // Normal mode: separate Start/Stop
+    container.innerHTML = `
+      <button class="start" onclick="startWithUser()">Start</button>
+      <button class="stop" onclick="post('/api/stop')">Stop</button>
+    `;
+    note.innerText = '';
+  }
 }
 
 async function post(url){
@@ -472,11 +510,11 @@ function fmtSession(s){
   // Compute energy: prefer session_energy_kwh, else delta, else live delta for ongoing
   let energy;
   if (s.session_energy_kwh != null) {
-    energy = s.session_energy_kwh.toFixed(3) + ' kWh';
+    energy = s.session_energy_kwh.toFixed(1) + ' kWh';
   } else if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
-    energy = (s.end_amount_kwh - s.start_amount_kwh).toFixed(3) + ' kWh';
+    energy = (s.end_amount_kwh - s.start_amount_kwh).toFixed(1) + ' kWh';
   } else {
-    energy = '0.000 kWh';
+    energy = '0.0 kWh';
   }
 
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
@@ -558,6 +596,13 @@ async function load(){
     document.getElementById('ampsVal').innerText = pendingAmps;
   }
 
+  // Track charging state for toggle button
+  const wasCharging = isCharging;
+  isCharging = (ch.output_state === 'Charging');
+  if (wasCharging !== isCharging) {
+    renderControlButtons();
+  }
+
   document.getElementById('statusText').innerHTML =
     kv("Plug", ch.plug_state ?? '-') +
     kv("Output", ch.output_state ?? '-') +
@@ -599,22 +644,34 @@ ampsEl.addEventListener('input', (e) => {
   debounceTimer = setTimeout(setAmps, 600); // debounce during drag
 });
 
-async function loadUsers(){
+async function loadSettings(){
   try {
     const r = await fetch('/api/settings');
     if (!r.ok) return;
     const settings = await r.json();
+
+    // Update clock settings
+    clockSettings.clock_start = settings.clock_start || '07:00';
+    clockSettings.clock_end = settings.clock_end || '23:00';
+
+    // Update users dropdown
     const users = settings.users || ['Lidor', 'Bar'];
     const sel = document.getElementById('userSelect');
     sel.innerHTML = users.map(u => `<option value="${u}">${u}</option>`).join('');
+
+    // Re-render control buttons based on clock
+    renderControlButtons();
   } catch(e) {}
 }
 
-loadUsers();
+loadSettings();
 load();
 loadSessions();
+renderControlButtons();
 setInterval(load, 2000);
 setInterval(loadSessions, 15000);
+// Re-check clock hours every minute (in case time crosses boundary)
+setInterval(renderControlButtons, 60000);
 </script>
 
 </body>
@@ -701,8 +758,7 @@ async function saveSettings(){
       })
     });
     if (r.ok) {
-      document.getElementById('status').innerText = '✅ Settings saved!';
-      document.getElementById('status').style.color = '#1db954';
+      window.location.href = '/';
     } else {
       document.getElementById('status').innerText = '❌ Failed to save';
       document.getElementById('status').style.color = '#ff4d4f';
