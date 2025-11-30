@@ -1,73 +1,87 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BS20 Control</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MG4 Charger Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; margin: 16px; }
-    .card { padding: 14px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 12px; }
-    .row { display:flex; gap:10px; }
-    button { flex:1; padding:16px; font-size:18px; border-radius:12px; border:0; cursor:pointer; }
-    .start { background:#1db954; color:white; }
-    .stop { background:#ff4d4f; color:white; }
-    .muted { color:#666; font-size:14px; }
-    .big { font-size:20px; font-weight:600; }
-    input[type=range] { width:100%; }
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
-    .kv { display:flex; justify-content:space-between; }
-    @media (max-width: 480px) {
-      .grid { grid-template-columns: 1fr; }
+    :root {
+      --primary-green: #10B981;
+      --primary-red: #EF4444;
+    }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
   </style>
 </head>
-<body>
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <h2 style="margin:0;">MG4 Charger</h2>
-    <div style="display:flex; gap:8px;">
-      <button onclick="location.href='/calculator'" style="flex:none; padding:6px 12px; font-size:14px; border:1px solid #ccc; background:#fff;">Calculator</button>
-      <button onclick="location.href='/settings'" style="flex:none; padding:6px 12px; font-size:14px; border:1px solid #ccc; background:#fff;">Settings</button>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+      <h1 class="text-xl font-semibold text-gray-900">MG4 Charger</h1>
+      <div class="flex space-x-2">
+        <button onclick="location.href='/calculator'" class="text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 rounded-lg transition">Calculator</button>
+        <button onclick="location.href='/settings'" class="text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 rounded-lg transition">Settings</button>
+      </div>
     </div>
-  </div>
+  </header>
 
-  <div class="card" style="margin-top:12px;">
-    <div class="big">User</div>
-    <select id="userSelect" style="margin-top:8px; padding:8px; border-radius:8px; width:100%; font-size:16px;">
-    </select>
-    <div class="muted" style="margin-top:6px;">Selected user will be attached to new sessions.</div>
-  </div>
-
-  <div class="card" id="controlCard">
-    <div class="row" id="controlButtons">
-      <!-- Buttons rendered by JS based on clock hours -->
+  <!-- Main Content -->
+  <main class="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
+    <!-- User Section -->
+    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
+      <h2 class="text-lg font-semibold text-gray-900 mb-2">User</h2>
+      <select id="userSelect" class="block w-full rounded-lg border border-gray-300 py-2.5 pl-3 pr-10 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+      </select>
+      <p class="mt-2 text-sm text-gray-500">Selected user will be attached to new sessions.</p>
     </div>
-    <div class="muted" id="clockModeNote" style="margin-top:8px;"></div>
-  </div>
-  <div class="card">
-    <div class="big">Max Amps: <span id="ampsVal">-</span>A</div>
-    <input id="amps" type="range" min="6" max="16" step="1" disabled style="opacity:0.5;"
-       oninput="ampsVal.innerText=this.value"
-       onchange="setAmps()" />
-  </div>
 
-  <div class="card">
-    <div class="big">Status</div>
-    <div class="muted" id="availability">...</div>
-    <div class="muted" id="lastUpdate" style="margin-top:4px;">Last update: -</div>
-    <div id="statusText"></div>
-  </div>
-
-  <div class="card">
-    <div class="big">Telemetry</div>
-    <div class="grid" id="telemetry"></div>
-  </div>
-
-  <div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div class="big">History</div>
-      <button onclick="location.href='/sessions'" style="flex:none; margin:0; padding:6px 12px; font-size:14px; border:1px solid #ccc; background:#fff;">View All →</button>
+    <!-- Controls Section -->
+    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
+      <div class="flex gap-3" id="controlButtons">
+        <!-- Buttons rendered by JS based on clock hours -->
+      </div>
+      <p class="mt-2 text-sm text-gray-500" id="clockModeNote"></p>
     </div>
-    <div id="history" class="muted" style="margin-top:8px;">No sessions yet.</div>
-  </div>
+
+    <!-- Amps Slider -->
+    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
+      <div class="text-lg font-semibold text-gray-900 mb-3">Max Amps: <span id="ampsVal" class="text-emerald-600">-</span>A</div>
+      <input id="amps" type="range" min="6" max="16" step="1" disabled
+         class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed accent-emerald-500"
+         oninput="ampsVal.innerText=this.value"
+         onchange="setAmps()" />
+    </div>
+
+    <!-- Status and Telemetry Grid -->
+    <div class="grid md:grid-cols-2 gap-4 mb-4">
+      <!-- Status Card -->
+      <div class="bg-white rounded-xl p-5 shadow-sm">
+        <div class="flex justify-between items-start mb-3">
+          <h2 class="text-lg font-semibold text-gray-900">Status</h2>
+          <span id="availability" class="text-sm font-medium text-gray-600">...</span>
+        </div>
+        <p class="text-xs text-gray-500 italic mb-3" id="lastUpdate">Last update: -</p>
+        <div id="statusText" class="space-y-1"></div>
+      </div>
+
+      <!-- Telemetry Card -->
+      <div class="bg-white rounded-xl p-5 shadow-sm">
+        <h2 class="text-lg font-semibold text-gray-900 mb-3">Telemetry</h2>
+        <div id="telemetry" class="space-y-1"></div>
+      </div>
+    </div>
+
+    <!-- History Section -->
+    <div class="bg-white rounded-xl p-5 shadow-sm">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">History</h2>
+        <button onclick="location.href='/sessions'" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View All →</button>
+      </div>
+      <div id="history" class="text-sm text-gray-500">No sessions yet.</div>
+    </div>
+  </main>
 
 <script>
 let isDragging = false;
@@ -75,11 +89,11 @@ let debounceTimer = null;
 
 // optimistic lock
 let pendingAmps = null;
-let lockUntilTs = 0;  // timestamp ms until which we don't overwrite slider
+let lockUntilTs = 0;
 
 let clockSettings = { clock_start: '07:00', clock_end: '23:00' };
 let isCharging = false;
-let hasData = false;  // true once we receive first MQTT data
+let hasData = false;
 
 function currentUser(){
   const sel = document.getElementById('userSelect');
@@ -87,7 +101,6 @@ function currentUser(){
 }
 
 function isWithinClockHours(){
-  // Get current time in Jerusalem
   const now = new Date();
   const jerusalemTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
   const currentMinutes = jerusalemTime.getHours() * 60 + jerusalemTime.getMinutes();
@@ -98,10 +111,8 @@ function isWithinClockHours(){
   const endMinutes = endH * 60 + endM;
 
   if (startMinutes <= endMinutes) {
-    // Normal range (e.g. 07:00 - 23:00)
     return currentMinutes >= startMinutes && currentMinutes < endMinutes;
   } else {
-    // Overnight range (e.g. 23:00 - 07:00)
     return currentMinutes >= startMinutes || currentMinutes < endMinutes;
   }
 }
@@ -112,26 +123,23 @@ function renderControlButtons(){
   const withinClock = isWithinClockHours();
 
   if (!hasData) {
-    // No data yet – show disabled buttons
     container.innerHTML = `
-      <button class="start" disabled style="opacity:0.5;cursor:not-allowed;">Start</button>
-      <button class="stop" disabled style="opacity:0.5;cursor:not-allowed;">Stop</button>
+      <button class="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-gray-300 cursor-not-allowed" disabled>Start</button>
+      <button class="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-gray-300 cursor-not-allowed" disabled>Stop</button>
     `;
     note.innerText = '⏳ Waiting for charger data...';
     return;
   }
 
   if (withinClock) {
-    // Clock mode: single toggle button (Stop toggles both)
     const label = isCharging ? 'Stop ⏹️' : 'Start ▶️';
-    const cls = isCharging ? 'stop' : 'start';
-    container.innerHTML = `<button class="${cls}" onclick="post('/api/stop')" style="width:100%;">${label}</button>`;
+    const bgClass = isCharging ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500 hover:bg-emerald-600';
+    container.innerHTML = `<button class="flex-1 py-3 px-4 rounded-xl font-bold text-white transition cursor-pointer ${bgClass}" onclick="post('/api/stop')">${label}</button>`;
     note.innerText = '🕐 Clock mode active – toggle charging with one button';
   } else {
-    // Normal mode: separate Start/Stop
     container.innerHTML = `
-      <button class="start" onclick="startWithUser()">Start</button>
-      <button class="stop" onclick="post('/api/stop')">Stop</button>
+      <button class="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-emerald-500 hover:bg-emerald-600 transition cursor-pointer" onclick="startWithUser()">Start</button>
+      <button class="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 transition cursor-pointer" onclick="post('/api/stop')">Stop</button>
     `;
     note.innerText = '';
   }
@@ -154,20 +162,18 @@ async function startWithUser(){
 
 async function setAmps(){
   const v = Number(document.getElementById('amps').value);
-
-  // lock UI to this value for 4 seconds
   pendingAmps = v;
   lockUntilTs = Date.now() + 4000;
-
-  // send command
   await post('/api/amps/' + v);
-
-  // after a bit, force a refresh
   setTimeout(load, 800);
 }
 
-function kv(k,v){
-  return `<div class="kv"><div>${k}</div><div><b>${v}</b></div></div>`;
+function kv(k, v, highlight = false){
+  const valueClass = highlight ? 'font-bold text-emerald-600' : 'font-semibold text-gray-900';
+  return `<div class="flex justify-between text-sm">
+    <span class="text-gray-600">${k}</span>
+    <span class="${valueClass}">${v}</span>
+  </div>`;
 }
 
 function fmtDate(isoStr){
@@ -187,10 +193,9 @@ function fmtDate(isoStr){
   }
 }
 
-let pricePerKwh = 0;  // loaded from settings
-const CLOCK_DISCOUNT = 0.8; // 20% off during clock hours
+let pricePerKwh = 0;
+const CLOCK_DISCOUNT = 0.8;
 
-// Check if a given minute-of-day is within clock hours
 function isMinuteInClock(minute) {
   const [startH, startM] = clockSettings.clock_start.split(':').map(Number);
   const [endH, endM] = clockSettings.clock_end.split(':').map(Number);
@@ -200,12 +205,10 @@ function isMinuteInClock(minute) {
   if (startMinutes <= endMinutes) {
     return minute >= startMinutes && minute < endMinutes;
   } else {
-    // Overnight range
     return minute >= startMinutes || minute < endMinutes;
   }
 }
 
-// Calculate minutes spent in clock vs non-clock for a session
 function calcClockMinutes(startedAt, endedAt) {
   const startDate = new Date(startedAt);
   const endDate = endedAt ? new Date(endedAt) : new Date();
@@ -213,10 +216,8 @@ function calcClockMinutes(startedAt, endedAt) {
   let clockMins = 0;
   let nonClockMins = 0;
 
-  // Iterate minute by minute (for accuracy across day boundaries)
   const current = new Date(startDate);
   while (current < endDate) {
-    // Get Jerusalem time for this minute
     const jTime = new Date(current.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
     const minuteOfDay = jTime.getHours() * 60 + jTime.getMinutes();
 
@@ -239,11 +240,9 @@ function calcSessionCost(energyVal, startedAt, endedAt) {
 
   if (totalMins === 0) return energyVal * pricePerKwh;
 
-  // Split energy proportionally by time
   const clockEnergy = energyVal * (clockMins / totalMins);
   const nonClockEnergy = energyVal * (nonClockMins / totalMins);
 
-  // Clock hours get 20% discount
   const clockCost = clockEnergy * pricePerKwh * CLOCK_DISCOUNT;
   const nonClockCost = nonClockEnergy * pricePerKwh;
 
@@ -255,7 +254,6 @@ function fmtSession(s){
   const ongoing = !s.ended_at;
   const end = ongoing ? '⚡ ongoing' : fmtDate(s.ended_at);
 
-  // Compute energy: prefer session_energy_kwh, else delta
   let energyVal = 0;
   if (s.session_energy_kwh != null) {
     energyVal = s.session_energy_kwh;
@@ -267,11 +265,16 @@ function fmtSession(s){
 
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
 
-  return `<div class="kv" style="margin-bottom:8px;">
-    <div style="flex:1;">
-      <div><b>${energy}</b> · ${cost} · ${user}${ongoing ? ' 🔌' : ''}</div>
-      <div style="font-size:12px;color:#888;">${start} → ${end}</div>
+  return `<div class="py-2 border-b border-gray-100 last:border-0">
+    <div class="flex items-center gap-2">
+      <span class="font-bold text-gray-900">${energy}</span>
+      <span class="text-gray-500">·</span>
+      <span class="text-gray-600">${cost}</span>
+      <span class="text-gray-500">·</span>
+      <span class="text-gray-600">${user}</span>
+      ${ongoing ? '<span class="text-emerald-500">🔌</span>' : ''}
     </div>
+    <div class="text-xs text-gray-400 mt-0.5">${start} → ${end}</div>
   </div>`;
 }
 
@@ -288,9 +291,7 @@ async function loadSessions(){
     }
     const recent = list.slice(0, 10);
     el.innerHTML = recent.map(fmtSession).join('');
-  }catch(e){
-    // ignore
-  }
+  }catch(e){}
 }
 
 let lastUpdateTs = 0;
@@ -299,19 +300,18 @@ function updateLastUpdateDisplay(){
   const el = document.getElementById('lastUpdate');
   if (!lastUpdateTs) {
     el.innerText = 'Last update: -';
-    el.style.color = '#666';
+    el.className = 'text-xs text-gray-500 italic mb-3';
     return;
   }
   const agoSec = Math.round((Date.now() / 1000) - lastUpdateTs);
   const stale = agoSec > 30;
   el.innerText = 'Last update: ' + agoSec + 's ago';
-  el.style.color = stale ? '#ff4d4f' : '#1db954';
+  el.className = stale ? 'text-xs italic mb-3 text-red-500' : 'text-xs italic mb-3 text-emerald-500';
 }
 
 setInterval(updateLastUpdateDisplay, 1000);
 
 async function load(){
-  // don't fight user while dragging
   if (isDragging) return;
 
   const r = await fetch('/api/state');
@@ -320,48 +320,46 @@ async function load(){
   lastUpdateTs = data.last_update || 0;
   updateLastUpdateDisplay();
 
-  document.getElementById('availability').innerText =
-    "BLE Bridge: " + (data.availability === 'online' ? 'Connected ✅' : 'Disconnected ❌');
+  const availEl = document.getElementById('availability');
+  if (data.availability === 'online') {
+    availEl.innerHTML = 'Connected <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 ml-1"></span>';
+  } else {
+    availEl.innerHTML = 'Disconnected <span class="inline-block w-2 h-2 rounded-full bg-red-500 ml-1"></span>';
+  }
 
   const ch = data.charge || {};
   const cfg = data.config || {};
 
   const telemAmps = cfg.charge_amps;
 
-  // ✅ Only overwrite slider from telemetry if:
-  // - not dragging
-  // - and either no pending amps, or telemetry already matched it, or lock expired
   const lockActive = pendingAmps !== null && Date.now() < lockUntilTs;
   const telemMatchesPending = pendingAmps !== null && telemAmps === pendingAmps;
 
   if (!lockActive || telemMatchesPending){
-    if (telemMatchesPending) pendingAmps = null; // unlock once matched
+    if (telemMatchesPending) pendingAmps = null;
     document.getElementById('amps').value = telemAmps ?? 16;
     document.getElementById('ampsVal').innerText = telemAmps ?? '-';
   } else {
-    // keep showing optimistic value
     document.getElementById('amps').value = pendingAmps;
     document.getElementById('ampsVal').innerText = pendingAmps;
   }
 
-  // Track charging state for toggle button
   const wasCharging = isCharging;
   const hadData = hasData;
   isCharging = (ch.output_state === 'Charging');
-  hasData = Object.keys(ch).length > 0;  // We have data if charge object is not empty
+  hasData = Object.keys(ch).length > 0;
 
   if (wasCharging !== isCharging || hadData !== hasData) {
     renderControlButtons();
-    // Enable/disable slider based on data availability
     const ampsSlider = document.getElementById('amps');
     ampsSlider.disabled = !hasData;
-    ampsSlider.style.opacity = hasData ? '1' : '0.5';
   }
 
-  document.getElementById('statusText').innerHTML =
-    kv("Plug", ch.plug_state ?? '-') +
-    kv("State", ch.output_state ?? '-') +
-    kv("Errors", ch.error_details ?? '-') ;
+  const statusHtml = [];
+  statusHtml.push(kv("Plug", ch.plug_state ?? '-'));
+  statusHtml.push(kv("State", ch.output_state ?? '-', ch.output_state === 'Charging'));
+  statusHtml.push(kv("Errors", ch.error_details ?? '-'));
+  document.getElementById('statusText').innerHTML = statusHtml.join('');
 
   function fmtPhase(v, a) {
     if (v == null && a == null) return '-';
@@ -384,13 +382,12 @@ async function load(){
   t.push(kv("L2", fmtPhase(ch.l2_voltage, ch.l2_amperage)));
   t.push(kv("L3", fmtPhase(ch.l3_voltage, ch.l3_amperage)));
   t.push(kv("Charging Rate", ch.total_energy != null ? ch.total_energy + ' kW' : '-'));
-  t.push(kv("Acc kWh", ch.current_amount != null ? ch.current_amount.toFixed(1) + ' kWh' : '-'));
+  t.push(kv("Acc kWh", ch.current_amount != null ? ch.current_amount.toFixed(1) + ' kWh' : '-', true));
   t.push(kv("Temperature", ch.inner_temp_c != null ? ch.inner_temp_c + '°C' : '-'));
   t.push(kv("Signal Strength", rssiToWord(cfg.rssi)));
   document.getElementById('telemetry').innerHTML = t.join('');
 }
 
-// drag handlers
 const ampsEl = document.getElementById('amps');
 
 ampsEl.addEventListener('touchstart', () => { isDragging = true; });
@@ -399,17 +396,16 @@ ampsEl.addEventListener('mousedown',  () => { isDragging = true; });
 function dragEnd(){
   isDragging = false;
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(setAmps, 400); // send shortly after release
+  debounceTimer = setTimeout(setAmps, 400);
 }
 
 ampsEl.addEventListener('touchend', dragEnd);
 ampsEl.addEventListener('mouseup',  dragEnd);
 
-// update number live while dragging
 ampsEl.addEventListener('input', (e) => {
   document.getElementById('ampsVal').innerText = e.target.value;
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(setAmps, 600); // debounce during drag
+  debounceTimer = setTimeout(setAmps, 600);
 });
 
 async function loadSettings(){
@@ -418,24 +414,19 @@ async function loadSettings(){
     if (!r.ok) return;
     const settings = await r.json();
 
-    // Update clock settings
     clockSettings.clock_start = settings.clock_start || '07:00';
     clockSettings.clock_end = settings.clock_end || '23:00';
 
-    // Update price
     pricePerKwh = settings.price_per_kwh;
 
-    // Update users dropdown
     const users = settings.users || ['Lidor', 'Bar'];
     const sel = document.getElementById('userSelect');
     sel.innerHTML = users.map(u => `<option value="${u}">${u}</option>`).join('');
 
-    // Re-render control buttons based on clock
     renderControlButtons();
   } catch(e) {}
 }
 
-// Load settings first, then load data
 loadSettings().then(() => {
   load();
   loadSessions();
@@ -443,10 +434,8 @@ loadSettings().then(() => {
 });
 setInterval(load, 2000);
 setInterval(loadSessions, 15000);
-// Re-check clock hours every minute (in case time crosses boundary)
 setInterval(renderControlButtons, 60000);
 </script>
 
 </body>
 </html>
-

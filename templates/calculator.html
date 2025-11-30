@@ -1,84 +1,102 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Charging Calculator</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Charging Calculator - MG4 Charger</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; margin: 16px; }
-    .card { padding: 14px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 12px; }
-    .muted { color:#666; font-size:14px; }
-    .big { font-size:20px; font-weight:600; }
-    input { padding:12px; border-radius:8px; border:1px solid #ccc; font-size:16px; width:100%; box-sizing:border-box; margin-top:8px; }
-    button { padding:14px 24px; font-size:16px; border-radius:12px; border:1px solid #ccc; background:#fff; cursor:pointer; margin-top:12px; width:100%; }
-    button:hover { background:#f5f5f5; }
-    .btn-primary { background:#1677ff; color:#fff; border:none; }
-    .btn-primary:hover { background:#4096ff; }
-    .result { margin-top:16px; padding:16px; background:#f0fdf4; border-radius:12px; text-align:center; display:none; }
-    .result.error { background:#fef2f2; }
-    .result-value { font-size:32px; font-weight:700; color:#1db954; }
-    .result.error .result-value { color:#ff4d4f; }
-    .result-label { font-size:14px; color:#666; margin-top:4px; }
-    .info-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #eee; }
-    .info-row:last-child { border-bottom:none; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
   </style>
 </head>
-<body>
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <h2 style="margin:0;">🔌 Charging Calculator</h2>
-    <button onclick="location.href='/'" style="width:auto; margin:0; padding:8px 16px;">← Back</button>
-  </div>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+      <h1 class="text-xl font-semibold text-gray-900">🔌 Charging Calculator</h1>
+      <button onclick="location.href='/'" class="text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 rounded-lg transition">← Back</button>
+    </div>
+  </header>
 
-  <div class="card" style="margin-top:12px;">
-    <label class="muted">Current Battery %</label>
-    <input type="number" id="currentPercent" min="0" max="100" value="20" inputmode="numeric" />
-  </div>
+  <!-- Main Content -->
+  <main class="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
+    <div class="grid md:grid-cols-2 gap-4">
+      <!-- Input Column -->
+      <div class="space-y-4">
+        <!-- Current Battery -->
+        <div class="bg-white rounded-xl p-5 shadow-sm">
+          <label class="block text-sm font-medium text-gray-600 mb-2">Current Battery %</label>
+          <input type="number" id="currentPercent" min="0" max="100" value="20" inputmode="numeric" 
+            class="w-full rounded-lg border border-gray-300 py-3 px-4 text-lg text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+        </div>
 
-  <div class="card">
-    <label class="muted">Target Battery %</label>
-    <input type="number" id="targetPercent" min="0" max="100" value="80" inputmode="numeric" />
-  </div>
+        <!-- Target Battery -->
+        <div class="bg-white rounded-xl p-5 shadow-sm">
+          <label class="block text-sm font-medium text-gray-600 mb-2">Target Battery %</label>
+          <input type="number" id="targetPercent" min="0" max="100" value="80" inputmode="numeric"
+            class="w-full rounded-lg border border-gray-300 py-3 px-4 text-lg text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+        </div>
 
-  <div class="card">
-    <label class="muted">Time Available (hours)</label>
-    <input type="number" id="availableHours" min="0" step="0.5" value="8" inputmode="decimal" />
-  </div>
+        <!-- Time Available -->
+        <div class="bg-white rounded-xl p-5 shadow-sm">
+          <label class="block text-sm font-medium text-gray-600 mb-2">Time Available (hours)</label>
+          <input type="number" id="availableHours" min="0" step="0.5" value="8" inputmode="decimal"
+            class="w-full rounded-lg border border-gray-300 py-3 px-4 text-lg text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+        </div>
 
-  <div class="card">
-    <label class="muted">Balancing Time (minutes)</label>
-    <input type="number" id="balancingMinutes" min="0" value="0" inputmode="numeric" />
-    <div class="muted" style="margin-top:6px;">Extra time when charging slows near full to equalize cell voltages</div>
-  </div>
-
-  <div class="result" id="result">
-    <div class="result-value" id="resultValue">-</div>
-    <div class="result-label" id="resultLabel">Recommended Amps</div>
-    <button class="btn-primary" id="setAmpsBtn" onclick="setAmps()" style="margin-top:12px; display:none;">Set Amps</button>
-  </div>
-
-  <div class="card" id="detailsCard" style="display:none;">
-    <div class="big">📊 Details</div>
-    <div style="margin-top:12px;">
-      <div class="info-row">
-        <span class="muted">Battery Capacity</span>
-        <span id="detailCapacity">-</span>
+        <!-- Balancing Time -->
+        <div class="bg-white rounded-xl p-5 shadow-sm">
+          <label class="block text-sm font-medium text-gray-600 mb-2">Balancing Time (minutes)</label>
+          <input type="number" id="balancingMinutes" min="0" value="0" inputmode="numeric"
+            class="w-full rounded-lg border border-gray-300 py-3 px-4 text-lg text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+          <p class="text-xs text-gray-500 mt-2">Extra time when charging slows near full to equalize cell voltages</p>
+        </div>
       </div>
-      <div class="info-row">
-        <span class="muted">Energy Needed</span>
-        <span id="detailEnergy">-</span>
-      </div>
-      <div class="info-row">
-        <span class="muted">Actual Charging Time</span>
-        <span id="detailTime">-</span>
-      </div>
-      <div class="info-row">
-        <span class="muted">Charging Rate</span>
-        <span id="detailPower">-</span>
+
+      <!-- Result Column -->
+      <div class="space-y-4">
+        <!-- Result Card -->
+        <div class="bg-white rounded-xl p-6 shadow-sm" id="resultCard">
+          <div class="text-center">
+            <div class="text-5xl font-bold text-emerald-600" id="resultValue">-</div>
+            <div class="text-sm text-gray-500 mt-2" id="resultLabel">Recommended Amps</div>
+            <button id="setAmpsBtn" onclick="setAmps()" style="display:none;"
+              class="mt-4 w-full py-3 px-4 rounded-xl font-bold text-white bg-emerald-500 hover:bg-emerald-600 transition cursor-pointer">
+              Set Amps
+            </button>
+          </div>
+        </div>
+
+        <!-- Details Card -->
+        <div class="bg-white rounded-xl p-5 shadow-sm" id="detailsCard" style="display:none;">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">📊 Details</h3>
+          <div class="space-y-3">
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-600">Battery Capacity</span>
+              <span class="font-semibold text-gray-900" id="detailCapacity">-</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-600">Energy Needed</span>
+              <span class="font-semibold text-gray-900" id="detailEnergy">-</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-600">Actual Charging Time</span>
+              <span class="font-semibold text-gray-900" id="detailTime">-</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-600">Charging Rate</span>
+              <span class="font-semibold text-gray-900" id="detailPower">-</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
+  </main>
 
 <script>
-let batteryCapacity = 64; // Default, loaded from settings
+let batteryCapacity = 64;
 let calculatedAmps = 0;
 
 async function loadSettings() {
@@ -96,50 +114,49 @@ function calculate() {
   const availableHours = parseFloat(document.getElementById('availableHours').value) || 0;
   const balancingMinutes = parseFloat(document.getElementById('balancingMinutes').value) || 0;
 
-  const resultEl = document.getElementById('result');
+  const resultCard = document.getElementById('resultCard');
   const resultValue = document.getElementById('resultValue');
   const resultLabel = document.getElementById('resultLabel');
   const detailsCard = document.getElementById('detailsCard');
+  const setAmpsBtn = document.getElementById('setAmpsBtn');
 
   // Validation
   if (targetPercent <= currentPercent) {
-    resultEl.style.display = 'block';
-    resultEl.className = 'result error';
+    resultCard.className = 'bg-red-50 rounded-xl p-6 shadow-sm';
+    resultValue.className = 'text-5xl font-bold text-red-500';
     resultValue.innerText = '⚠️';
     resultLabel.innerText = 'Target must be higher than current %';
     detailsCard.style.display = 'none';
+    setAmpsBtn.style.display = 'none';
     return;
   }
 
   // Calculate
   const percentNeeded = targetPercent - currentPercent;
-  const energyNeeded = (percentNeeded / 100) * batteryCapacity; // kWh
-  // Apply 10% safety margin to available time
+  const energyNeeded = (percentNeeded / 100) * batteryCapacity;
   const safeAvailableHours = availableHours * 0.9;
   const actualChargingHours = safeAvailableHours - (balancingMinutes / 60);
 
   if (actualChargingHours <= 0) {
-    resultEl.style.display = 'block';
-    resultEl.className = 'result error';
+    resultCard.className = 'bg-red-50 rounded-xl p-6 shadow-sm';
+    resultValue.className = 'text-5xl font-bold text-red-500';
     resultValue.innerText = '⚠️';
     resultLabel.innerText = 'Not enough time after balancing';
     detailsCard.style.display = 'none';
+    setAmpsBtn.style.display = 'none';
     return;
   }
 
   const requiredPowerKw = energyNeeded / actualChargingHours;
-  
-  // Formula: Amps = (energyNeeded × 16) / (10 × effectiveTime)
-  // Which equals: energyNeeded × 1.6 / effectiveTime
   const requiredAmps = (energyNeeded * 16) / (10 * actualChargingHours);
 
   // Show result
-  resultEl.style.display = 'block';
-  resultEl.className = 'result';
-  const setAmpsBtn = document.getElementById('setAmpsBtn');
+  resultCard.className = 'bg-white rounded-xl p-6 shadow-sm';
+  resultValue.className = 'text-5xl font-bold text-emerald-600';
   
   if (requiredAmps > 16) {
-    resultEl.className = 'result error';
+    resultCard.className = 'bg-amber-50 rounded-xl p-6 shadow-sm';
+    resultValue.className = 'text-5xl font-bold text-amber-600';
     resultValue.innerText = requiredAmps.toFixed(1) + ' A';
     resultLabel.innerText = '⚠️ Exceeds max 16A - need more time!';
     calculatedAmps = 16;
@@ -173,22 +190,25 @@ async function setAmps() {
   const btn = document.getElementById('setAmpsBtn');
   btn.disabled = true;
   btn.innerText = 'Setting...';
+  btn.className = 'mt-4 w-full py-3 px-4 rounded-xl font-bold text-white bg-gray-400 cursor-not-allowed';
   
   try {
     const r = await fetch('/api/amps/' + calculatedAmps, { method: 'POST' });
     if (r.ok) {
       btn.innerText = '✓ Set to ' + calculatedAmps + ' A';
-      btn.style.background = '#1db954';
+      btn.className = 'mt-4 w-full py-3 px-4 rounded-xl font-bold text-white bg-emerald-500';
       setTimeout(() => {
         window.location.href = '/';
       }, 500);
     } else {
       btn.innerText = '✗ Failed';
       btn.disabled = false;
+      btn.className = 'mt-4 w-full py-3 px-4 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 transition cursor-pointer';
     }
   } catch(e) {
     btn.innerText = '✗ Error';
     btn.disabled = false;
+    btn.className = 'mt-4 w-full py-3 px-4 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 transition cursor-pointer';
   }
 }
 
@@ -202,4 +222,3 @@ loadSettings().then(() => calculate());
 
 </body>
 </html>
-

@@ -1,68 +1,23 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Login - EVSE</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - MG4 Charger</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { 
-      font-family: system-ui, -apple-system, sans-serif; 
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #f5f5f5;
-    }
-    .login-card {
-      background: white;
-      padding: 32px;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,.1);
-      width: 100%;
-      max-width: 320px;
-      margin: 16px;
-      text-align: center;
-    }
-    h1 { margin: 0 0 8px 0; font-size: 28px; }
-    .subtitle { color: #666; margin-bottom: 24px; }
-    input {
-      width: 100%;
-      padding: 16px;
-      font-size: 24px;
-      text-align: center;
-      letter-spacing: 8px;
-      border: 2px solid #ddd;
-      border-radius: 12px;
-      box-sizing: border-box;
-      margin-bottom: 16px;
-    }
-    input:focus {
-      outline: none;
-      border-color: #1db954;
-    }
-    button {
-      width: 100%;
-      padding: 16px;
-      font-size: 18px;
-      background: #1db954;
-      color: white;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-    }
-    button:hover { background: #1aa34a; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
-    .error {
-      color: #ff4d4f;
-      margin-top: 12px;
-      display: none;
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
   </style>
 </head>
-<body>
-  <div class="login-card">
-    <h1>🔌 MG4 Charger</h1>
-    <div class="subtitle">Enter PIN to continue</div>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm mx-4">
+    <div class="text-center mb-8">
+      <div class="text-5xl mb-4">🔌</div>
+      <h1 class="text-2xl font-bold text-gray-900">MG4 Charger</h1>
+      <p class="text-gray-500 mt-2">Enter PIN to continue</p>
+    </div>
     
     <input 
       type="password" 
@@ -72,11 +27,15 @@
       pattern="[0-9]*"
       placeholder="••••"
       autofocus
+      class="w-full text-center text-3xl tracking-widest py-4 px-6 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-0 focus:outline-none transition"
     />
     
-    <button onclick="login()" id="loginBtn">Enter</button>
+    <button onclick="login()" id="loginBtn" 
+      class="w-full mt-6 py-4 px-6 rounded-xl font-bold text-white bg-emerald-500 hover:bg-emerald-600 transition cursor-pointer disabled:bg-gray-300 disabled:cursor-not-allowed">
+      Enter
+    </button>
     
-    <div class="error" id="error">Invalid PIN. Try again.</div>
+    <p class="text-red-500 text-center mt-4 text-sm" id="error" style="display:none;">Invalid PIN. Try again.</p>
   </div>
 
 <script>
@@ -126,4 +85,3 @@ async function login() {
 
 </body>
 </html>
-
