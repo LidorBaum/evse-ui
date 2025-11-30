@@ -95,6 +95,65 @@ def _send_telegram(message: str):
 # ---- Templates directory ----
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
+# ---- Cost calculation ----
+CLOCK_DISCOUNT = 0.8  # 20% off during clock hours
+
+def _is_minute_in_clock(minute: int, clock_start: str, clock_end: str) -> bool:
+    """Check if a minute-of-day is within clock hours."""
+    start_h, start_m = map(int, clock_start.split(':'))
+    end_h, end_m = map(int, clock_end.split(':'))
+    start_mins = start_h * 60 + start_m
+    end_mins = end_h * 60 + end_m
+    
+    if start_mins <= end_mins:
+        return minute >= start_mins and minute < end_mins
+    else:
+        # Overnight range
+        return minute >= start_mins or minute < end_mins
+
+def _calc_session_cost(energy: float, started_at: str, ended_at: str) -> float:
+    """Calculate session cost with clock discount."""
+    if energy <= 0:
+        return 0.0
+    
+    price_per_kwh = app_settings.get("price_per_kwh", 0.55)
+    clock_start = app_settings.get("clock_start", "23:00")
+    clock_end = app_settings.get("clock_end", "07:00")
+    
+    try:
+        start_dt = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+        end_dt = datetime.fromisoformat(ended_at.replace('Z', '+00:00'))
+    except:
+        return energy * price_per_kwh
+    
+    total_mins = max(1, int((end_dt - start_dt).total_seconds() / 60))
+    
+    # Sample every 5 minutes for speed
+    clock_mins = 0
+    step = max(1, total_mins // 100)
+    samples = 0
+    
+    for i in range(0, total_mins, step):
+        sample_time = start_dt + __import__('datetime').timedelta(minutes=i)
+        # Convert to Jerusalem time
+        jerusalem_hour = (sample_time.hour + 2) % 24  # Rough UTC+2 approximation
+        minute_of_day = jerusalem_hour * 60 + sample_time.minute
+        
+        if _is_minute_in_clock(minute_of_day, clock_start, clock_end):
+            clock_mins += step
+        samples += 1
+    
+    clock_mins = min(clock_mins, total_mins)
+    non_clock_mins = total_mins - clock_mins
+    
+    # Split energy proportionally
+    clock_energy = energy * (clock_mins / total_mins) if total_mins > 0 else 0
+    non_clock_energy = energy * (non_clock_mins / total_mins) if total_mins > 0 else energy
+    
+    # Apply discount to clock hours
+    cost = (clock_energy * price_per_kwh * CLOCK_DISCOUNT) + (non_clock_energy * price_per_kwh)
+    return cost
+
 def _load_settings() -> dict:
     defaults = {
         "clock_start": "07:00",
@@ -312,13 +371,18 @@ def _update_sessions_from_charge(charge: dict):
                 current_session["session_energy_kwh"] = None
 
             user = current_session.get("meta", {}).get("user", "Unknown")
+            started_at = current_session.get("started_at", ts)
             sessions.append(current_session)
             current_session = None
             _save_sessions()
             # Telegram notification for session end
+            battery_capacity = app_settings.get("battery_capacity_kwh", 64.0)
+            battery_pct = round((session_energy / battery_capacity) * 100) if battery_capacity > 0 else 0
+            session_cost = _calc_session_cost(session_energy, started_at, ts)
             _send_telegram(
                 f"⚡ <b>Charging Complete!</b>\n"
-                f"🔋 Energy: {session_energy:.1f} kWh\n"
+                f"🔋 Energy: {session_energy:.1f} kWh (+{battery_pct}%)\n"
+                f"💰 Cost: ₪{session_cost:.2f}\n"
                 f"👤 User: {user}"
             )
         elif current_session is not None and is_active:
