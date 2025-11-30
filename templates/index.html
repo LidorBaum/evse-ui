@@ -32,7 +32,7 @@
     <!-- User Section -->
     <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
       <h2 class="text-lg font-semibold text-gray-900 mb-2">User</h2>
-      <select id="userSelect" class="block w-full rounded-lg border border-gray-300 py-2.5 pl-3 pr-10 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+      <select id="userSelect" class="block w-full max-w-xs rounded-lg border border-gray-300 py-2.5 pl-3 pr-10 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500 text-sm">
       </select>
       <p class="mt-2 text-sm text-gray-500">Selected user will be attached to new sessions.</p>
     </div>
@@ -47,7 +47,7 @@
 
     <!-- Amps Slider -->
     <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
-      <div class="text-lg font-semibold text-gray-900 mb-3">Max Amps: <span id="ampsVal" class="text-emerald-600">-</span>A</div>
+      <div class="text-lg font-semibold text-gray-900 mb-3">Max Amps: <span id="ampsVal">-</span>A</div>
       <input id="amps" type="range" min="6" max="16" step="1" disabled
          class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed accent-emerald-500"
          oninput="ampsVal.innerText=this.value"
@@ -385,7 +385,7 @@ async function load(){
   t.push(kv("L2", fmtPhase(ch.l2_voltage, ch.l2_amperage)));
   t.push(kv("L3", fmtPhase(ch.l3_voltage, ch.l3_amperage)));
   t.push(kv("Charging Rate", ch.total_energy != null ? ch.total_energy + ' kW' : '-'));
-  t.push(kv("Acc kWh", ch.current_amount != null ? ch.current_amount.toFixed(1) + ' kWh' : '-', true));
+  t.push(kv("Acc kWh", ch.current_amount != null ? ch.current_amount.toFixed(1) + ' kWh' : '-'));
   t.push(kv("Temperature", ch.inner_temp_c != null ? ch.inner_temp_c + '°C' : '-'));
   t.push(kv("Signal Strength", rssiToWord(cfg.rssi)));
   document.getElementById('telemetry').innerHTML = t.join('');
