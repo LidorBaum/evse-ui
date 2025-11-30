@@ -15,6 +15,9 @@
     input[type=range] { width:100%; }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
     .kv { display:flex; justify-content:space-between; }
+    @media (max-width: 480px) {
+      .grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -374,6 +377,7 @@ async function load(){
   t.push(kv("L2", fmtPhase(ch.l2_voltage, ch.l2_amperage)));
   t.push(kv("L3", fmtPhase(ch.l3_voltage, ch.l3_amperage)));
   t.push(kv("Charging Rate", ch.total_energy != null ? ch.total_energy + ' kW' : '-'));
+  t.push(kv("Acc kWh", ch.current_amount != null ? ch.current_amount.toFixed(1) : '-'));
   t.push(kv("Inner °C", ch.inner_temp_c ?? '-'));
   t.push(kv("Signal Strength", rssiToWord(cfg.rssi)));
   document.getElementById('telemetry').innerHTML = t.join('');

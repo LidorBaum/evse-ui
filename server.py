@@ -134,6 +134,52 @@ def _save_sessions():
         pass
 
 
+def _check_for_missed_session(amount_val: float | None, ts: str):
+    """
+    Detect if a session happened while Pi was offline.
+    Compare current_amount to the last session's end_amount_kwh.
+    If there's a gap, create a ghost session to account for the missing energy.
+    """
+    global sessions
+
+    if amount_val is None:
+        return
+
+    # Get the last completed session's end_amount_kwh
+    if not sessions:
+        return
+
+    last_session = sessions[-1]
+    last_end_amount = last_session.get("end_amount_kwh")
+
+    if last_end_amount is None:
+        return
+
+    # Check for gap (with small tolerance for floating point)
+    gap = amount_val - last_end_amount
+    if gap < 0.01:  # Less than 0.01 kWh difference, no gap
+        return
+
+    # There's a gap! Create a ghost session
+    last_ended_at = last_session.get("ended_at") or ts
+    ghost_session = {
+        "id": f"ghost-{int(time.time())}-{len(sessions)+1}",
+        "started_at": last_ended_at,
+        "ended_at": ts,
+        "start_amount_kwh": last_end_amount,
+        "end_amount_kwh": amount_val,
+        "session_energy_kwh": gap,
+        "meta": {
+            "plug_state": None,
+            "output_state": None,
+            "current_state": None,
+            "user": "Unknown (offline)",
+        },
+    }
+    sessions.append(ghost_session)
+    _save_sessions()
+
+
 def _update_sessions_from_charge(charge: dict):
     """
     Very simple heuristic:
@@ -161,6 +207,11 @@ def _update_sessions_from_charge(charge: dict):
     is_active = energy_val is not None and energy_val > 0
 
     with _sessions_lock:
+        # Check for missed sessions while Pi was offline
+        # Only check if: no active session, not currently charging, and we have amount data
+        if current_session is None and not is_active and amount_val is not None:
+            _check_for_missed_session(amount_val, ts)
+
         if current_session is None and is_active:
             # Start of a new session
             session_id = f"{int(time.time())}-{len(sessions)+1}"
