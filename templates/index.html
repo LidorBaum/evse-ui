@@ -22,7 +22,7 @@
 </head>
 <body>
   <div style="display:flex; justify-content:space-between; align-items:center;">
-    <h2 style="margin:0;">BS20 Charger</h2>
+    <h2 style="margin:0;">MG4 Charger</h2>
     <a href="/settings" style="font-size:24px; text-decoration:none;">⚙️</a>
   </div>
 
@@ -381,8 +381,8 @@ async function load(){
   t.push(kv("L2", fmtPhase(ch.l2_voltage, ch.l2_amperage)));
   t.push(kv("L3", fmtPhase(ch.l3_voltage, ch.l3_amperage)));
   t.push(kv("Charging Rate", ch.total_energy != null ? ch.total_energy + ' kW' : '-'));
-  t.push(kv("Acc kWh", ch.current_amount != null ? ch.current_amount.toFixed(1) : '-'));
-  t.push(kv("Inner °C", ch.inner_temp_c ?? '-'));
+  t.push(kv("Acc kWh", ch.current_amount != null ? ch.current_amount.toFixed(1) + ' kWh' : '-'));
+  t.push(kv("Temperature", ch.inner_temp_c != null ? ch.inner_temp_c + '°C' : '-'));
   t.push(kv("Signal Strength", rssiToWord(cfg.rssi)));
   document.getElementById('telemetry').innerHTML = t.join('');
 }
