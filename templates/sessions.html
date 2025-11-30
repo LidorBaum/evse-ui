@@ -18,13 +18,9 @@
     .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
     .month-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
     .month-row:last-child { border-bottom: none; }
-    @media (min-width: 600px) {
-      .container { max-width: 500px; margin: 0 auto; }
-    }
   </style>
 </head>
 <body>
-<div class="container">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <h2 style="margin:0;">📋 All Sessions</h2>
     <button onclick="location.href='/'">← Back</button>
@@ -327,6 +323,5 @@ async function loadSessions(){
 loadSettings().then(() => loadSessions());
 </script>
 
-</div>
 </body>
 </html>
