@@ -14,9 +14,13 @@
     .btn-primary { background:#1677ff; color:#fff; border:none; }
     .btn-primary:hover { background:#4096ff; }
     .row { display:flex; gap:10px; align-items:center; }
+    @media (min-width: 600px) {
+      .container { max-width: 420px; margin: 0 auto; }
+    }
   </style>
 </head>
 <body>
+<div class="container">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <h2 style="margin:0;">⚙️ Settings</h2>
     <button onclick="location.href='/'" style="margin:0; padding:8px 16px;">← Back</button>
@@ -115,6 +119,7 @@ async function saveSettings(){
 loadSettings();
 </script>
 
+</div>
 </body>
 </html>
 
