@@ -180,10 +180,8 @@ async function setAmps() {
       btn.innerText = '✓ Set to ' + calculatedAmps + ' A';
       btn.style.background = '#1db954';
       setTimeout(() => {
-        btn.innerText = 'Set ' + calculatedAmps + ' A';
-        btn.style.background = '';
-        btn.disabled = false;
-      }, 2000);
+        window.location.href = '/';
+      }, 500);
     } else {
       btn.innerText = '✗ Failed';
       btn.disabled = false;
