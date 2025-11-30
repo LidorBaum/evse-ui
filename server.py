@@ -613,16 +613,29 @@ async function load(){
     kv("State", ch.output_state ?? '-') +
     kv("Errors", ch.error_details ?? '-') ;
 
+  function fmtPhase(v, a) {
+    if (v == null && a == null) return '-';
+    const vStr = v != null ? Math.round(v) + 'V' : '-';
+    const aStr = a != null ? Math.round(a) + 'A' : '-';
+    return vStr + ' ' + aStr;
+  }
+
+  function rssiToWord(rssi) {
+    if (rssi == null) return '-';
+    if (rssi >= -50) return 'Excellent';
+    if (rssi >= -70) return 'Good';
+    if (rssi >= -80) return 'Fair';
+    if (rssi >= -90) return 'Weak';
+    return 'Very Weak';
+  }
+
   const t = [];
-  t.push(kv("L1 V", ch.l1_voltage ?? '-'));
-  t.push(kv("L1 A", ch.l1_amperage ?? '-'));
-  t.push(kv("L2 V", ch.l2_voltage ?? '-'));
-  t.push(kv("L2 A", ch.l2_amperage ?? '-'));
-  t.push(kv("L3 V", ch.l3_voltage ?? '-'));
-  t.push(kv("L3 A", ch.l3_amperage ?? '-'));
+  t.push(kv("L1", fmtPhase(ch.l1_voltage, ch.l1_amperage)));
+  t.push(kv("L2", fmtPhase(ch.l2_voltage, ch.l2_amperage)));
+  t.push(kv("L3", fmtPhase(ch.l3_voltage, ch.l3_amperage)));
   t.push(kv("Charging Rate", ch.total_energy != null ? ch.total_energy + ' kW' : '-'));
   t.push(kv("Inner °C", ch.inner_temp_c ?? '-'));
-  t.push(kv("RSSI", cfg.rssi ?? '-'));
+  t.push(kv("RSSI", rssiToWord(cfg.rssi)));
   document.getElementById('telemetry').innerHTML = t.join('');
 }
 
@@ -698,8 +711,8 @@ def settings_page():
     .muted { color:#666; font-size:14px; }
     .big { font-size:20px; font-weight:600; }
     input, select { padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px; width:100%; box-sizing:border-box; margin-top:8px; }
-    button { padding:14px 24px; font-size:16px; border-radius:12px; border:0; background:#1db954; color:white; cursor:pointer; margin-top:12px; }
-    button:hover { background:#18a349; }
+    button { padding:14px 24px; font-size:16px; border-radius:12px; border:1px solid #ccc; background:#fff; cursor:pointer; margin-top:12px; }
+    button:hover { background:#f5f5f5; }
     .row { display:flex; gap:10px; align-items:center; }
   </style>
 </head>
