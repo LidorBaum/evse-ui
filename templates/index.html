@@ -363,7 +363,7 @@ async function load(){
   function fmtPhase(v, a) {
     if (v == null && a == null) return '-';
     const vStr = v != null ? Math.round(v) + 'V' : '-';
-    const aStr = a != null ? Math.round(a) + 'A' : '-';
+    const aStr = a != null ? a.toFixed(1) + 'A' : '-';
     return vStr + ' ' + aStr;
   }
 
