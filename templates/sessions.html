@@ -12,6 +12,12 @@
     .session:last-child { border-bottom: none; }
     button { padding:8px 16px; font-size:16px; border-radius:12px; border:1px solid #ccc; background:#fff; cursor:pointer; }
     button:hover { background:#f5f5f5; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+    .stat-item { text-align: center; padding: 12px; background: #f8f9fa; border-radius: 8px; }
+    .stat-value { font-size: 24px; font-weight: 700; color: #1db954; }
+    .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
+    .month-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+    .month-row:last-child { border-bottom: none; }
   </style>
 </head>
 <body>
@@ -21,13 +27,28 @@
   </div>
 
   <div class="card" style="margin-top:12px;">
-    <div id="sessionsList" class="muted">Loading...</div>
+    <div class="big">📊 Summary</div>
+    <div id="stats" class="muted" style="margin-top:12px;">Loading...</div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="big">📅 Monthly Breakdown</div>
+      <button onclick="toggleMonths()" id="monthsToggle" style="padding:4px 10px; font-size:13px;">Show</button>
+    </div>
+    <div id="monthlyBreakdown" style="display:none; margin-top:12px;"></div>
+  </div>
+
+  <div class="card">
+    <div class="big">🔋 All Sessions</div>
+    <div id="sessionsList" class="muted" style="margin-top:12px;">Loading...</div>
   </div>
 
 <script>
-let pricePerKwh = 0;  // loaded from settings
+let pricePerKwh = 0;
 let clockSettings = { clock_start: '23:00', clock_end: '07:00' };
 const CLOCK_DISCOUNT = 0.8;
+let allSessions = [];
 
 function fmtDate(isoStr){
   if (!isoStr) return '?';
@@ -99,17 +120,159 @@ function calcSessionCost(energyVal, startedAt, endedAt) {
   return clockCost + nonClockCost;
 }
 
+function getSessionEnergy(s) {
+  if (s.session_energy_kwh != null) return s.session_energy_kwh;
+  if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
+    return s.end_amount_kwh - s.start_amount_kwh;
+  }
+  return 0;
+}
+
+function getSessionDurationMins(s) {
+  if (!s.started_at) return 0;
+  const start = new Date(s.started_at);
+  const end = s.ended_at ? new Date(s.ended_at) : new Date();
+  return (end - start) / 60000;
+}
+
+function fmtDuration(mins) {
+  if (mins < 60) return Math.round(mins) + ' min';
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  return h + 'h ' + m + 'm';
+}
+
+function getMonthKey(isoStr) {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  const jTime = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+  const year = jTime.getFullYear();
+  const month = String(jTime.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function getMonthName(monthKey) {
+  const [year, month] = monthKey.split('-');
+  const d = new Date(year, parseInt(month) - 1, 1);
+  return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function renderStats(sessions) {
+  const now = new Date();
+  const currentMonthKey = getMonthKey(now.toISOString());
+  
+  let totalKwh = 0;
+  let totalCost = 0;
+  let monthKwh = 0;
+  let monthCost = 0;
+  let monthSessions = 0;
+  let totalDuration = 0;
+  let biggestSession = 0;
+
+  sessions.forEach(s => {
+    const energy = getSessionEnergy(s);
+    const cost = calcSessionCost(energy, s.started_at, s.ended_at);
+    const duration = getSessionDurationMins(s);
+    const monthKey = getMonthKey(s.started_at);
+
+    totalKwh += energy;
+    totalCost += cost;
+    totalDuration += duration;
+    if (energy > biggestSession) biggestSession = energy;
+
+    if (monthKey === currentMonthKey) {
+      monthKwh += energy;
+      monthCost += cost;
+      monthSessions++;
+    }
+  });
+
+  const avgCost = sessions.length > 0 ? totalCost / sessions.length : 0;
+  const avgDuration = sessions.length > 0 ? totalDuration / sessions.length : 0;
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-value">₪${monthCost.toFixed(0)}</div>
+        <div class="stat-label">This Month</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">₪${totalCost.toFixed(0)}</div>
+        <div class="stat-label">All Time</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${monthKwh.toFixed(0)}</div>
+        <div class="stat-label">kWh This Month</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${totalKwh.toFixed(0)}</div>
+        <div class="stat-label">kWh All Time</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${sessions.length}</div>
+        <div class="stat-label">Total Sessions</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${monthSessions}</div>
+        <div class="stat-label">Sessions This Month</div>
+      </div>
+    </div>
+    <div style="text-align:center; margin-top:8px; padding:8px; background:#fff3cd; border-radius:8px;">
+      🏆 <b>Biggest charge:</b> ${biggestSession.toFixed(1)} kWh
+    </div>
+  `;
+}
+
+function renderMonthlyBreakdown(sessions) {
+  const months = {};
+
+  sessions.forEach(s => {
+    const monthKey = getMonthKey(s.started_at);
+    if (!monthKey) return;
+
+    if (!months[monthKey]) {
+      months[monthKey] = { kwh: 0, cost: 0, count: 0 };
+    }
+
+    const energy = getSessionEnergy(s);
+    const cost = calcSessionCost(energy, s.started_at, s.ended_at);
+
+    months[monthKey].kwh += energy;
+    months[monthKey].cost += cost;
+    months[monthKey].count++;
+  });
+
+  const sortedMonths = Object.keys(months).sort().reverse();
+
+  const html = sortedMonths.map(key => {
+    const m = months[key];
+    return `<div class="month-row">
+      <div><b>${getMonthName(key)}</b> <span class="muted">(${m.count} sessions)</span></div>
+      <div><b>${m.kwh.toFixed(0)} kWh</b> · ₪${m.cost.toFixed(0)}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('monthlyBreakdown').innerHTML = html || '<div class="muted">No data</div>';
+}
+
+function toggleMonths() {
+  const el = document.getElementById('monthlyBreakdown');
+  const btn = document.getElementById('monthsToggle');
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    btn.innerText = 'Hide';
+  } else {
+    el.style.display = 'none';
+    btn.innerText = 'Show';
+  }
+}
+
 function fmtSession(s){
   const start = fmtDate(s.started_at);
   const ongoing = !s.ended_at;
   const end = ongoing ? '⚡ ongoing' : fmtDate(s.ended_at);
 
-  let energyVal = 0;
-  if (s.session_energy_kwh != null) {
-    energyVal = s.session_energy_kwh;
-  } else if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
-    energyVal = s.end_amount_kwh - s.start_amount_kwh;
-  }
+  const energyVal = getSessionEnergy(s);
   const energy = energyVal.toFixed(1) + ' kWh';
   const cost = '₪' + calcSessionCost(energyVal, s.started_at, s.ended_at).toFixed(2);
 
@@ -137,13 +300,17 @@ async function loadSessions(){
     const r = await fetch('/api/sessions');
     if (!r.ok) return;
     const data = await r.json();
-    const list = data.sessions || [];
-    const el = document.getElementById('sessionsList');
-    if (!list.length) {
-      el.innerText = 'No sessions yet.';
+    allSessions = data.sessions || [];
+    
+    if (!allSessions.length) {
+      document.getElementById('stats').innerHTML = '<div class="muted">No sessions yet.</div>';
+      document.getElementById('sessionsList').innerText = 'No sessions yet.';
       return;
     }
-    el.innerHTML = list.map(fmtSession).join('');
+
+    renderStats(allSessions);
+    renderMonthlyBreakdown(allSessions);
+    document.getElementById('sessionsList').innerHTML = allSessions.map(fmtSession).join('');
   } catch(e) {
     document.getElementById('sessionsList').innerText = 'Failed to load sessions.';
   }
@@ -154,4 +321,3 @@ loadSettings().then(() => loadSessions());
 
 </body>
 </html>
-
