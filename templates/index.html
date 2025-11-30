@@ -77,6 +77,35 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+    /* Charging animation */
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+      50% { box-shadow: 0 0 20px 10px rgba(16, 185, 129, 0.2); }
+    }
+    @keyframes energy-flow {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .charging-active {
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+    .charging-bar {
+      background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(16, 185, 129, 0.3) 25%, 
+        rgba(16, 185, 129, 0.6) 50%, 
+        rgba(16, 185, 129, 0.3) 75%, 
+        transparent 100%);
+      background-size: 200% 100%;
+      animation: energy-flow 1.5s linear infinite;
+    }
+    @keyframes bolt-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.1); }
+    }
+    .bolt-animate {
+      animation: bolt-pulse 1s ease-in-out infinite;
+    }
   </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-200">
@@ -135,13 +164,20 @@
     <!-- Status and Telemetry Grid -->
     <div class="grid md:grid-cols-2 gap-4 mb-4">
       <!-- Status Card -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
-        <div class="flex justify-between items-start mb-3">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Status</h2>
-          <span id="availability" class="text-sm font-medium text-gray-600 dark:text-gray-400">...</span>
+      <div id="statusCard" class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors relative overflow-hidden">
+        <!-- Charging animation bar -->
+        <div id="chargingBar" class="absolute inset-0 charging-bar opacity-0 pointer-events-none transition-opacity duration-500"></div>
+        <div class="relative z-10">
+          <div class="flex justify-between items-start mb-3">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 cursor-pointer select-none" ondblclick="toggleDemoMode()">
+              Status
+              <span id="chargingBolt" class="hidden text-xl bolt-animate">⚡</span>
+            </h2>
+            <span id="availability" class="text-sm font-medium text-gray-600 dark:text-gray-400">...</span>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 italic mb-3" id="lastUpdate">Last update: -</p>
+          <div id="statusText" class="space-y-1"></div>
         </div>
-        <p class="text-xs text-gray-500 dark:text-gray-400 italic mb-3" id="lastUpdate">Last update: -</p>
-        <div id="statusText" class="space-y-1"></div>
       </div>
 
       <!-- Telemetry Card -->
@@ -189,6 +225,32 @@ let hasData = false;
 let lastErrorDetails = null;
 let errorDismissed = false;
 let notificationsEnabled = false;
+let demoMode = false;
+
+// Demo mode toggle - triple-click on Status card header to toggle
+function toggleDemoMode() {
+  demoMode = !demoMode;
+  updateChargingAnimation(demoMode);
+  console.log('Demo mode:', demoMode ? 'ON ⚡' : 'OFF');
+}
+
+function updateChargingAnimation(charging) {
+  const statusCard = document.getElementById('statusCard');
+  const chargingBar = document.getElementById('chargingBar');
+  const chargingBolt = document.getElementById('chargingBolt');
+  
+  if (charging) {
+    statusCard.classList.add('charging-active');
+    chargingBar.classList.remove('opacity-0');
+    chargingBar.classList.add('opacity-100');
+    chargingBolt.classList.remove('hidden');
+  } else {
+    statusCard.classList.remove('charging-active');
+    chargingBar.classList.add('opacity-0');
+    chargingBar.classList.remove('opacity-100');
+    chargingBolt.classList.add('hidden');
+  }
+}
 
 // Dark mode
 function initDarkMode() {
@@ -589,6 +651,11 @@ async function load(){
     renderControlButtons();
     const ampsSlider = document.getElementById('amps');
     ampsSlider.disabled = !hasData;
+  }
+
+  // Update charging animation (unless demo mode is active)
+  if (!demoMode) {
+    updateChargingAnimation(isCharging);
   }
 
   // Error detection
