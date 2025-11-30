@@ -40,7 +40,12 @@
   </div>
 
   <div class="card">
-    <div class="big">🔋 All Sessions</div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="big">🔋 Sessions</div>
+      <select id="userFilter" onchange="applyFilter()" style="padding:6px 12px; border-radius:8px; border:1px solid #ccc; font-size:14px;">
+        <option value="">All Users</option>
+      </select>
+    </div>
     <div id="sessionsList" class="muted" style="margin-top:12px;">Loading...</div>
   </div>
 
@@ -49,6 +54,7 @@ let pricePerKwh = 0;
 let clockSettings = { clock_start: '23:00', clock_end: '07:00' };
 const CLOCK_DISCOUNT = 0.8;
 let allSessions = [];
+let selectedUser = '';
 
 function fmtDate(isoStr){
   if (!isoStr) return '?';
@@ -299,6 +305,42 @@ async function loadSettings(){
   } catch(e) {}
 }
 
+function getFilteredSessions() {
+  if (!selectedUser) return allSessions;
+  return allSessions.filter(s => {
+    const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
+    return user === selectedUser;
+  });
+}
+
+function populateUserFilter() {
+  const users = new Set();
+  allSessions.forEach(s => {
+    const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
+    users.add(user);
+  });
+  
+  const select = document.getElementById('userFilter');
+  const sortedUsers = Array.from(users).sort();
+  
+  select.innerHTML = '<option value="">All Users</option>' + 
+    sortedUsers.map(u => `<option value="${u}">${u}</option>`).join('');
+}
+
+function applyFilter() {
+  selectedUser = document.getElementById('userFilter').value;
+  const filtered = getFilteredSessions();
+  
+  renderStats(filtered);
+  renderMonthlyBreakdown(filtered);
+  
+  if (!filtered.length) {
+    document.getElementById('sessionsList').innerText = 'No sessions for this user.';
+  } else {
+    document.getElementById('sessionsList').innerHTML = filtered.map(fmtSession).join('');
+  }
+}
+
 async function loadSessions(){
   try {
     const r = await fetch('/api/sessions');
@@ -312,9 +354,8 @@ async function loadSessions(){
       return;
     }
 
-    renderStats(allSessions);
-    renderMonthlyBreakdown(allSessions);
-    document.getElementById('sessionsList').innerHTML = allSessions.map(fmtSession).join('');
+    populateUserFilter();
+    applyFilter();
   } catch(e) {
     document.getElementById('sessionsList').innerText = 'Failed to load sessions.';
   }
