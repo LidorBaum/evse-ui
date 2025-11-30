@@ -194,6 +194,7 @@ function fmtDate(isoStr){
 }
 
 let pricePerKwh = 0;
+let batteryCapacity = 64; // kWh, loaded from settings
 const CLOCK_DISCOUNT = 0.8;
 
 function isMinuteInClock(minute) {
@@ -261,13 +262,15 @@ function fmtSession(s){
     energyVal = s.end_amount_kwh - s.start_amount_kwh;
   }
   const energy = energyVal.toFixed(1) + ' kWh';
+  const batteryPct = batteryCapacity > 0 ? Math.round((energyVal / batteryCapacity) * 100) : 0;
   const cost = '₪' + calcSessionCost(energyVal, s.started_at, s.ended_at).toFixed(2);
 
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
 
   return `<div class="py-2 border-b border-gray-100 last:border-0">
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 flex-wrap">
       <span class="font-bold text-gray-900">${energy}</span>
+      <span class="text-emerald-600 font-medium">(+${batteryPct}%)</span>
       <span class="text-gray-500">·</span>
       <span class="text-gray-600">${cost}</span>
       <span class="text-gray-500">·</span>
@@ -418,6 +421,7 @@ async function loadSettings(){
     clockSettings.clock_end = settings.clock_end || '23:00';
 
     pricePerKwh = settings.price_per_kwh;
+    batteryCapacity = settings.battery_capacity_kwh || 64;
 
     const users = settings.users || ['Lidor', 'Bar'];
     const sel = document.getElementById('userSelect');
