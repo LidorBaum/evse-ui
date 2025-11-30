@@ -333,7 +333,7 @@ def ui():
     body { font-family: system-ui, -apple-system, sans-serif; margin: 16px; }
     .card { padding: 14px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 12px; }
     .row { display:flex; gap:10px; }
-    button { flex:1; padding:16px; font-size:18px; border-radius:12px; border:0; }
+    button { flex:1; padding:16px; font-size:18px; border-radius:12px; border:0; cursor:pointer; }
     .start { background:#1db954; color:white; }
     .stop { background:#ff4d4f; color:white; }
     .muted { color:#666; font-size:14px; }
@@ -362,15 +362,6 @@ def ui():
     </div>
     <div class="muted" id="clockModeNote" style="margin-top:8px;"></div>
   </div>
-  <div class="card">
-    <div class="big">Bluetooth Control</div>
-    <div class="row" style="margin-top:8px;">
-      <button onclick="pauseBle(30)">Pause 30s</button>
-      <button onclick="pauseBle(60)">Pause 60s</button>
-    </div>
-    <div class="muted" id="pauseNote" style="margin-top:8px;"></div>
-  </div>
-
   <div class="card">
     <div class="big">Max Amps: <span id="ampsVal">-</span>A</div>
     <input id="amps" type="range" min="6" max="16" step="1"
@@ -476,12 +467,6 @@ async function post(url){
 async function startWithUser(){
   const user = encodeURIComponent(currentUser());
   await post('/api/start_for/' + user);
-}
-
-async function pauseBle(sec){
-  await post('/api/pause_ble/' + sec);
-  document.getElementById('pauseNote').innerText =
-    "BLE paused for " + sec + "s. You can connect with your phone app now.";
 }
 
 async function setAmps(){
@@ -625,8 +610,7 @@ async function load(){
 
   document.getElementById('statusText').innerHTML =
     kv("Plug", ch.plug_state ?? '-') +
-    kv("Output", ch.output_state ?? '-') +
-    kv("State", ch.current_state ?? '-') +
+    kv("State", ch.output_state ?? '-') +
     kv("Errors", ch.error_details ?? '-') ;
 
   const t = [];
@@ -746,6 +730,13 @@ def settings_page():
     <input type="text" id="usersList" placeholder="Lidor, Bar" />
   </div>
 
+  <div class="card">
+    <div class="big">Bluetooth Control</div>
+    <div class="muted">Pause BLE bridge to connect with phone app</div>
+    <button onclick="pauseBle(60)" style="margin-top:12px; width:100%;">Pause 60s</button>
+    <div class="muted" id="pauseNote" style="margin-top:8px;"></div>
+  </div>
+
   <button onclick="saveSettings()">Save Settings</button>
   <div id="status" class="muted" style="margin-top:12px;"></div>
 
@@ -758,6 +749,16 @@ async function loadSettings(){
     document.getElementById('clockStart').value = s.clock_start || '06:00';
     document.getElementById('clockEnd').value = s.clock_end || '23:00';
     document.getElementById('usersList').value = (s.users || []).join(', ');
+  } catch(e) {}
+}
+
+async function pauseBle(sec){
+  try {
+    const r = await fetch('/api/pause_ble/' + sec, {method: 'POST'});
+    if (r.ok) {
+      document.getElementById('pauseNote').innerText =
+        "BLE paused for " + sec + "s. You can connect with your phone app now.";
+    }
   } catch(e) {}
 }
 
