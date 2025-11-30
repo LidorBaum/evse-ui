@@ -81,6 +81,13 @@
       <input type="number" id="pricePerKwh" step="0.01" min="0" class="mt-3 w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
     </div>
 
+    <!-- Clock Discount -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Clock Discount</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Discount percentage during clock hours (e.g., 20 = 20% off)</p>
+      <input type="number" id="clockDiscount" step="1" min="0" max="100" placeholder="20" class="mt-3 w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
+    </div>
+
     <!-- Battery Capacity -->
     <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
       <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Battery Capacity</h2>
@@ -126,6 +133,7 @@ async function loadSettings(){
     document.getElementById('clockEnd').value = s.clock_end || '23:00';
     document.getElementById('usersList').value = (s.users || []).join(', ');
     document.getElementById('pricePerKwh').value = s.price_per_kwh;
+    document.getElementById('clockDiscount').value = s.clock_discount_percent ?? 20;
     document.getElementById('batteryCapacity').value = s.battery_capacity_kwh || 64;
   } catch(e) {}
 }
@@ -172,6 +180,7 @@ async function saveSettings(){
   const usersRaw = document.getElementById('usersList').value;
   const users = usersRaw.split(',').map(u => u.trim()).filter(u => u.length > 0);
   const pricePerKwh = parseFloat(document.getElementById('pricePerKwh').value) || 0;
+  const clockDiscount = parseInt(document.getElementById('clockDiscount').value) || 20;
   const batteryCapacity = parseFloat(document.getElementById('batteryCapacity').value) || 64;
 
   try {
@@ -183,6 +192,7 @@ async function saveSettings(){
         clock_end: clockEnd,
         users: users,
         price_per_kwh: pricePerKwh,
+        clock_discount_percent: clockDiscount,
         battery_capacity_kwh: batteryCapacity
       })
     });

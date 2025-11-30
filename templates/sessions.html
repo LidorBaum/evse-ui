@@ -136,7 +136,7 @@ const isDarkMode = (function() {
 
 let pricePerKwh = 0;
 let clockSettings = { clock_start: '23:00', clock_end: '07:00' };
-const CLOCK_DISCOUNT = 0.8;
+let clockDiscountPercent = 20;
 let allSessions = [];
 let selectedUser = '';
 let mainChart = null;
@@ -221,7 +221,8 @@ function calcSessionCost(energyVal, startedAt, endedAt) {
   const clockEnergy = energyVal * (clockMins / totalMins);
   const nonClockEnergy = energyVal * (nonClockMins / totalMins);
 
-  const clockCost = clockEnergy * pricePerKwh * CLOCK_DISCOUNT;
+  const discountMultiplier = 1 - (clockDiscountPercent / 100);
+  const clockCost = clockEnergy * pricePerKwh * discountMultiplier;
   const nonClockCost = nonClockEnergy * pricePerKwh;
 
   return clockCost + nonClockCost;
@@ -572,6 +573,7 @@ async function loadSettings(){
     if (!r.ok) return;
     const s = await r.json();
     pricePerKwh = s.price_per_kwh;
+    clockDiscountPercent = s.clock_discount_percent ?? 20;
     clockSettings.clock_start = s.clock_start || '23:00';
     clockSettings.clock_end = s.clock_end || '07:00';
   } catch(e) {}

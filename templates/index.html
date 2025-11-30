@@ -184,7 +184,7 @@
         <div id="chargingBarLeft" class="absolute inset-0 charging-bar-left opacity-0 pointer-events-none transition-opacity duration-500"></div>
         <div class="relative z-10">
           <div class="flex justify-between items-start mb-3">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 cursor-pointer select-none" ondblclick="toggleDemoMode()">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 select-none" ondblclick="toggleDemoMode()">
               Status
               <span id="chargingBolt" class="hidden text-xl bolt-animate">⚡</span>
             </h2>
@@ -468,7 +468,7 @@ function fmtDate(isoStr){
 
 let pricePerKwh = 0;
 let batteryCapacity = 64;
-const CLOCK_DISCOUNT = 0.8;
+let clockDiscountPercent = 20;
 
 function isMinuteInClock(minute) {
   const [startH, startM] = clockSettings.clock_start.split(':').map(Number);
@@ -517,7 +517,8 @@ function calcSessionCost(energyVal, startedAt, endedAt) {
   const clockEnergy = energyVal * (clockMins / totalMins);
   const nonClockEnergy = energyVal * (nonClockMins / totalMins);
 
-  const clockCost = clockEnergy * pricePerKwh * CLOCK_DISCOUNT;
+  const discountMultiplier = 1 - (clockDiscountPercent / 100);
+  const clockCost = clockEnergy * pricePerKwh * discountMultiplier;
   const nonClockCost = nonClockEnergy * pricePerKwh;
 
   return clockCost + nonClockCost;
@@ -762,6 +763,7 @@ async function loadSettings(){
     clockSettings.clock_end = settings.clock_end || '23:00';
 
     pricePerKwh = settings.price_per_kwh;
+    clockDiscountPercent = settings.clock_discount_percent ?? 20;
     batteryCapacity = settings.battery_capacity_kwh || 64;
 
     const users = settings.users || ['Lidor', 'Bar'];

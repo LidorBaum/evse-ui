@@ -96,7 +96,7 @@ def _send_telegram(message: str):
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 # ---- Cost calculation ----
-CLOCK_DISCOUNT = 0.8  # 20% off during clock hours
+DEFAULT_CLOCK_DISCOUNT = 20  # 20% off during clock hours
 
 def _is_minute_in_clock(minute: int, clock_start: str, clock_end: str) -> bool:
     """Check if a minute-of-day is within clock hours."""
@@ -151,7 +151,9 @@ def _calc_session_cost(energy: float, started_at: str, ended_at: str) -> float:
     non_clock_energy = energy * (non_clock_mins / total_mins) if total_mins > 0 else energy
     
     # Apply discount to clock hours
-    cost = (clock_energy * price_per_kwh * CLOCK_DISCOUNT) + (non_clock_energy * price_per_kwh)
+    discount_percent = app_settings.get("clock_discount_percent", DEFAULT_CLOCK_DISCOUNT)
+    discount_multiplier = 1 - (discount_percent / 100)
+    cost = (clock_energy * price_per_kwh * discount_multiplier) + (non_clock_energy * price_per_kwh)
     return cost
 
 def _load_settings() -> dict:
@@ -160,6 +162,7 @@ def _load_settings() -> dict:
         "clock_end": "23:00",
         "users": ["Lidor", "Bar"],
         "price_per_kwh": 0.55,
+        "clock_discount_percent": 20,  # 20% off during clock hours
         "battery_capacity_kwh": 64.0,  # MG4 default
     }
     needs_save = False
