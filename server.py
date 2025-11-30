@@ -564,6 +564,80 @@ def api_telegram_test():
     return {"ok": True, "message": message}
 
 
+def _send_telegram_file(file_path: str, caption: str = ""):
+    """Send a file via Telegram bot (blocking)."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return False, "Telegram not configured"
+    
+    try:
+        import urllib.request
+        import urllib.parse
+        
+        # Read file content
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Create multipart form data
+        boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
+        filename = os.path.basename(file_path)
+        
+        body = (
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="chat_id"\r\n\r\n'
+            f'{TELEGRAM_CHAT_ID}\r\n'
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="document"; filename="{filename}"\r\n'
+            f'Content-Type: application/json\r\n\r\n'
+            f'{content}\r\n'
+        )
+        
+        if caption:
+            body += (
+                f'--{boundary}\r\n'
+                f'Content-Disposition: form-data; name="caption"\r\n\r\n'
+                f'{caption}\r\n'
+            )
+        
+        body += f'--{boundary}--\r\n'
+        
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
+        req = urllib.request.Request(
+            url,
+            data=body.encode('utf-8'),
+            headers={'Content-Type': f'multipart/form-data; boundary={boundary}'}
+        )
+        urllib.request.urlopen(req, timeout=30)
+        return True, "File sent successfully"
+    except Exception as e:
+        return False, str(e)
+
+
+@app.post("/api/telegram/send-sessions")
+def api_telegram_send_sessions():
+    """Send sessions.json via Telegram."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return {"ok": False, "error": "Telegram not configured"}
+    
+    if not os.path.exists(SESSIONS_FILE):
+        return {"ok": False, "error": "Sessions file not found"}
+    
+    success, msg = _send_telegram_file(SESSIONS_FILE, "📋 Sessions data export")
+    return {"ok": success, "message": msg if success else None, "error": msg if not success else None}
+
+
+@app.post("/api/telegram/send-settings")
+def api_telegram_send_settings():
+    """Send settings.json via Telegram."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return {"ok": False, "error": "Telegram not configured"}
+    
+    if not os.path.exists(SETTINGS_FILE):
+        return {"ok": False, "error": "Settings file not found"}
+    
+    success, msg = _send_telegram_file(SETTINGS_FILE, "⚙️ Settings data export")
+    return {"ok": success, "message": msg if success else None, "error": msg if not success else None}
+
+
 @app.post("/api/start")
 def api_start():
     # Backwards‑compat: start without explicit user (records as "Unknown")
