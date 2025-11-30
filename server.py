@@ -399,7 +399,7 @@ def ui():
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center;">
       <div class="big">History</div>
-      <a href="/sessions" style="font-size:14px;">View All →</a>
+      <button onclick="location.href='/sessions'" style="margin:0; padding:6px 12px; font-size:14px;">View All →</button>
     </div>
     <div id="history" class="muted" style="margin-top:8px;">No sessions yet.</div>
   </div>
@@ -799,13 +799,15 @@ def settings_page():
     input, select { padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px; width:100%; box-sizing:border-box; margin-top:8px; }
     button { padding:14px 24px; font-size:16px; border-radius:12px; border:1px solid #ccc; background:#fff; cursor:pointer; margin-top:12px; }
     button:hover { background:#f5f5f5; }
+    .btn-primary { background:#1677ff; color:#fff; border:none; }
+    .btn-primary:hover { background:#4096ff; }
     .row { display:flex; gap:10px; align-items:center; }
   </style>
 </head>
 <body>
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <h2 style="margin:0;">⚙️ Settings</h2>
-    <a href="/" style="font-size:16px;">← Back</a>
+    <button onclick="location.href='/'" style="margin:0; padding:8px 16px;">← Back</button>
   </div>
 
   <div class="card" style="margin-top:12px;">
@@ -842,7 +844,7 @@ def settings_page():
     <div class="muted" id="pauseNote" style="margin-top:8px;"></div>
   </div>
 
-  <button onclick="saveSettings()">Save Settings</button>
+  <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
   <div id="status" class="muted" style="margin-top:12px;"></div>
 
 <script>
@@ -927,7 +929,7 @@ def sessions_page():
 <body>
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <h2 style="margin:0;">📋 All Sessions</h2>
-    <a href="/" style="font-size:16px;">← Back</a>
+    <button onclick="location.href='/'" style="padding:8px 16px;">← Back</button>
   </div>
 
   <div class="card" style="margin-top:12px;">
