@@ -81,7 +81,51 @@
     </div>
   </main>
 
+  <!-- Session Note Modal -->
+  <div id="noteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4 shadow-xl">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Edit Note</h3>
+      <input type="hidden" id="noteSessionId" />
+      <textarea id="noteText" rows="3" placeholder="e.g., Road trip prep, Weekly top-up..." 
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm"></textarea>
+      <div class="flex gap-3 mt-4">
+        <button onclick="closeNoteModal()" class="flex-1 py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
+        <button onclick="saveNote()" class="flex-1 py-2 px-4 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">Save</button>
+      </div>
+    </div>
+  </div>
+
 <script>
+// Note Modal functions
+function openNoteModal(sessionId, currentNote) {
+  document.getElementById('noteSessionId').value = sessionId;
+  document.getElementById('noteText').value = currentNote || '';
+  document.getElementById('noteModal').classList.remove('hidden');
+  document.getElementById('noteText').focus();
+}
+
+function closeNoteModal() {
+  document.getElementById('noteModal').classList.add('hidden');
+}
+
+async function saveNote() {
+  const sessionId = document.getElementById('noteSessionId').value;
+  const note = document.getElementById('noteText').value.trim();
+  
+  try {
+    const r = await fetch('/api/session/' + sessionId + '/note', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ note })
+    });
+    if (r.ok) {
+      closeNoteModal();
+      // Refresh sessions to show updated note
+      loadSessions();
+    }
+  } catch(e) {}
+}
+
 // Dark mode init
 const isDarkMode = (function() {
   const isDark = localStorage.getItem('darkMode') === 'true' || 
@@ -503,17 +547,22 @@ function fmtSession(s){
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
   const note = (s.meta && s.meta.note) ? s.meta.note : '';
 
-  return `<div class="py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
-    <div class="flex items-center gap-2 flex-wrap">
-      <span class="font-bold text-gray-900 dark:text-white">${energy}</span>
-      <span class="text-gray-400 dark:text-gray-500">·</span>
-      <span class="text-gray-600 dark:text-gray-400">${cost}</span>
-      <span class="text-gray-400 dark:text-gray-500">·</span>
-      <span class="text-gray-600 dark:text-gray-400">${user}</span>
-      ${ongoing ? '<span class="text-emerald-500 font-medium">🔌 Charging</span>' : ''}
+  return `<div class="py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 flex items-center gap-3">
+    <div class="flex-1">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="font-bold text-gray-900 dark:text-white">${energy}</span>
+        <span class="text-gray-400 dark:text-gray-500">·</span>
+        <span class="text-gray-600 dark:text-gray-400">${cost}</span>
+        <span class="text-gray-400 dark:text-gray-500">·</span>
+        <span class="text-gray-600 dark:text-gray-400">${user}</span>
+        ${ongoing ? '<span class="text-emerald-500 font-medium">🔌 Charging</span>' : ''}
+        ${note ? `<span class="text-gray-400 dark:text-gray-500">·</span><span class="text-amber-600 dark:text-amber-400 italic text-sm">${note}</span>` : ''}
+      </div>
+      <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">${start} → ${end}</div>
     </div>
-    ${note ? `<div class="text-xs text-amber-600 dark:text-amber-400 mt-1 italic">"${note}"</div>` : ''}
-    <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">${start} → ${end}</div>
+    <button onclick="openNoteModal('${s.id}', '${note.replace(/'/g, "\\'")}')" class="text-gray-400 dark:text-gray-500 hover:text-emerald-500 dark:hover:text-emerald-400 px-2 transition" title="${note || 'Add note'}">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+    </button>
   </div>`;
 }
 
