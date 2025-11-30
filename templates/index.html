@@ -99,7 +99,7 @@
         <button onclick="toggleDarkMode()" id="darkModeBtn" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition" title="Toggle dark mode">
           <span id="darkModeIcon">🌙</span>
         </button>
-        <button onclick="location.href='/calculator'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">Calculator</button>
+        <button onclick="location.href='/calculator'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">Amps Calculator</button>
         <button onclick="location.href='/settings'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">Settings</button>
       </div>
     </div>
@@ -453,21 +453,23 @@ function fmtSession(s){
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
   const note = (s.meta && s.meta.note) ? s.meta.note : '';
 
-  return `<div class="py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
-    <div class="flex items-center gap-2 flex-wrap">
-      <span class="font-bold text-gray-900 dark:text-white">${energy}</span>
-      <span class="text-emerald-600 dark:text-emerald-400 font-medium">(+${batteryPct}%)</span>
-      <span class="text-gray-500 dark:text-gray-500">·</span>
-      <span class="text-gray-600 dark:text-gray-400">${cost}</span>
-      <span class="text-gray-500 dark:text-gray-500">·</span>
-      <span class="text-gray-600 dark:text-gray-400">${user}</span>
-      ${ongoing ? '<span class="text-emerald-500">🔌</span>' : ''}
-      <button onclick="openNoteModal('${s.id}')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs ml-auto" title="${note || 'Add note'}">
-        ${note ? '📝' : '➕'}
-      </button>
+  return `<div class="py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 flex items-center gap-3">
+    <div class="flex-1">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="font-bold text-gray-900 dark:text-white">${energy}</span>
+        <span class="text-emerald-600 dark:text-emerald-400 font-medium">(+${batteryPct}%)</span>
+        <span class="text-gray-500 dark:text-gray-500">·</span>
+        <span class="text-gray-600 dark:text-gray-400">${cost}</span>
+        <span class="text-gray-500 dark:text-gray-500">·</span>
+        <span class="text-gray-600 dark:text-gray-400">${user}</span>
+        ${ongoing ? '<span class="text-emerald-500">🔌</span>' : ''}
+      </div>
+      ${note ? `<div class="text-xs text-amber-600 dark:text-amber-400 mt-1 italic">"${note}"</div>` : ''}
+      <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">${start} → ${end}</div>
     </div>
-    ${note ? `<div class="text-xs text-amber-600 dark:text-amber-400 mt-1 italic">"${note}"</div>` : ''}
-    <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">${start} → ${end}</div>
+    <button onclick="openNoteModal('${s.id}')" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-lg px-2" title="${note || 'Add note'}">
+      ${note ? '📝' : '+'}
+    </button>
   </div>`;
 }
 
