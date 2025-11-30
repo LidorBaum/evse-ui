@@ -95,24 +95,43 @@ function isMinuteInClock(minute) {
 function calcClockMinutes(startedAt, endedAt) {
   const startDate = new Date(startedAt);
   const endDate = endedAt ? new Date(endedAt) : new Date();
-
-  let clockMins = 0;
-  let nonClockMins = 0;
-
-  const current = new Date(startDate);
-  while (current < endDate) {
-    const jTime = new Date(current.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
-    const minuteOfDay = jTime.getHours() * 60 + jTime.getMinutes();
-
-    if (isMinuteInClock(minuteOfDay)) {
-      clockMins++;
-    } else {
-      nonClockMins++;
+  const totalMins = Math.max(0, Math.round((endDate - startDate) / 60000));
+  
+  if (totalMins === 0) return { clockMins: 0, nonClockMins: 0 };
+  
+  // Parse clock settings
+  const [startH, startM] = clockSettings.clock_start.split(':').map(Number);
+  const [endH, endM] = clockSettings.clock_end.split(':').map(Number);
+  const clockStart = startH * 60 + startM;
+  const clockEnd = endH * 60 + endM;
+  
+  // For short sessions (< 1 day), use simplified calculation
+  if (totalMins <= 1440) {
+    let clockMins = 0;
+    // Sample every 5 minutes instead of every minute for speed
+    const step = Math.max(1, Math.floor(totalMins / 100));
+    for (let i = 0; i < totalMins; i += step) {
+      const t = new Date(startDate.getTime() + i * 60000);
+      const jTime = new Date(t.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+      const minuteOfDay = jTime.getHours() * 60 + jTime.getMinutes();
+      
+      const inClock = clockStart <= clockEnd 
+        ? (minuteOfDay >= clockStart && minuteOfDay < clockEnd)
+        : (minuteOfDay >= clockStart || minuteOfDay < clockEnd);
+      
+      if (inClock) clockMins += step;
     }
-    current.setMinutes(current.getMinutes() + 1);
+    clockMins = Math.min(clockMins, totalMins);
+    return { clockMins, nonClockMins: totalMins - clockMins };
   }
-
-  return { clockMins, nonClockMins };
+  
+  // For longer sessions, estimate based on clock hours per day
+  const clockHoursPerDay = clockStart <= clockEnd 
+    ? (clockEnd - clockStart) / 60 
+    : (1440 - clockStart + clockEnd) / 60;
+  const clockRatio = clockHoursPerDay / 24;
+  const clockMins = Math.round(totalMins * clockRatio);
+  return { clockMins, nonClockMins: totalMins - clockMins };
 }
 
 function calcSessionCost(energyVal, startedAt, endedAt) {
@@ -337,14 +356,21 @@ function applyFilter() {
   selectedUser = document.getElementById('userFilter').value;
   const filtered = getFilteredSessions();
   
-  renderStats(filtered);
-  renderMonthlyBreakdown(filtered);
+  // Show loading state
+  document.getElementById('stats').innerHTML = '<div style="text-align:center;">⏳</div>';
+  document.getElementById('sessionsList').innerHTML = '<div style="text-align:center;">⏳</div>';
   
-  if (!filtered.length) {
-    document.getElementById('sessionsList').innerText = 'No sessions for this user.';
-  } else {
-    document.getElementById('sessionsList').innerHTML = filtered.map(fmtSession).join('');
-  }
+  // Use setTimeout to allow UI to update before heavy calculation
+  setTimeout(() => {
+    renderStats(filtered);
+    renderMonthlyBreakdown(filtered);
+    
+    if (!filtered.length) {
+      document.getElementById('sessionsList').innerText = 'No sessions for this user.';
+    } else {
+      document.getElementById('sessionsList').innerHTML = filtered.map(fmtSession).join('');
+    }
+  }, 10);
 }
 
 async function loadSessions(){
