@@ -64,6 +64,34 @@ MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "500"))
 # ---- Settings config ----
 SETTINGS_FILE = os.getenv("SETTINGS_FILE", "settings.json")
 
+# ---- Telegram notifications ----
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+def _send_telegram(message: str):
+    """Send a message via Telegram bot (non-blocking)."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+    
+    def _send():
+        try:
+            import urllib.request
+            import urllib.parse
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            data = urllib.parse.urlencode({
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": message,
+                "parse_mode": "HTML"
+            }).encode()
+            req = urllib.request.Request(url, data=data)
+            urllib.request.urlopen(req, timeout=10)
+        except Exception as e:
+            print(f"Telegram error: {e}")
+    
+    # Send in background thread to not block
+    t = threading.Thread(target=_send, daemon=True)
+    t.start()
+
 # ---- Templates directory ----
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -250,6 +278,7 @@ def _update_sessions_from_charge(charge: dict):
         if current_session is None and is_active:
             # Start of a new session
             session_id = f"{int(time.time())}-{len(sessions)+1}"
+            user = last_start_user or "Unknown"
             current_session = {
                 "id": session_id,
                 "started_at": ts,
@@ -262,10 +291,12 @@ def _update_sessions_from_charge(charge: dict):
                     "plug_state": charge.get("plug_state"),
                     "output_state": charge.get("output_state"),
                     "current_state": charge.get("current_state"),
-                    "user": last_start_user or "Unknown",
+                    "user": user,
                 },
             }
             _save_sessions()
+            # Telegram notification for session start
+            _send_telegram(f"🔌 <b>Charging Started</b>\n👤 User: {user}")
         elif current_session is not None and not is_active:
             # End of an existing session
             current_session["ended_at"] = ts
@@ -274,15 +305,22 @@ def _update_sessions_from_charge(charge: dict):
             # Session energy purely from the amount counter
             start_amt = current_session.get("start_amount_kwh")
             if start_amt is not None and amount_val is not None:
-                current_session["session_energy_kwh"] = max(
-                    0.0, amount_val - start_amt
-                )
+                session_energy = max(0.0, amount_val - start_amt)
+                current_session["session_energy_kwh"] = session_energy
             else:
+                session_energy = 0.0
                 current_session["session_energy_kwh"] = None
 
+            user = current_session.get("meta", {}).get("user", "Unknown")
             sessions.append(current_session)
             current_session = None
             _save_sessions()
+            # Telegram notification for session end
+            _send_telegram(
+                f"⚡ <b>Charging Complete!</b>\n"
+                f"🔋 Energy: {session_energy:.1f} kWh\n"
+                f"👤 User: {user}"
+            )
         elif current_session is not None and is_active:
             # Update rolling values while charging
             current_session["end_amount_kwh"] = amount_val
@@ -295,8 +333,10 @@ def on_connect(client, userdata, flags, rc):
     client.subscribe(f"{BASE}/state/config")
 
 
+_last_error_notified: str | None = None
+
 def on_message(client, userdata, msg):
-    global latest_charge, latest_config, availability, last_mqtt_update
+    global latest_charge, latest_config, availability, last_mqtt_update, _last_error_notified
     topic = msg.topic
     payload = msg.payload.decode(errors="ignore")
 
@@ -310,6 +350,15 @@ def on_message(client, userdata, msg):
         except Exception:
             latest_charge = {"raw": payload}
         _update_sessions_from_charge(latest_charge)
+        
+        # Check for errors and send Telegram notification
+        error_details = latest_charge.get("error_details", "")
+        is_error = error_details and "no error" not in error_details.lower()
+        if is_error and error_details != _last_error_notified:
+            _send_telegram(f"⚠️ <b>Charger Error!</b>\n{error_details}")
+            _last_error_notified = error_details
+        elif not is_error:
+            _last_error_notified = None
     elif topic.endswith("/state/config"):
         try:
             latest_config = json.loads(payload)
