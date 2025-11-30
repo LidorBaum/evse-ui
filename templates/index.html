@@ -82,22 +82,38 @@
       0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.3); }
       50% { box-shadow: 0 0 15px 5px rgba(16, 185, 129, 0.15); }
     }
-    @keyframes energy-flow {
+    /* Left card: flow enters from left, exits to right */
+    @keyframes energy-flow-left {
+      0% { background-position: 300% 0; }
+      100% { background-position: -100% 0; }
+    }
+    /* Right card: same timing, continues the flow */
+    @keyframes energy-flow-right {
       0% { background-position: 200% 0; }
       100% { background-position: -200% 0; }
     }
     .charging-active {
       animation: pulse-glow 3s ease-in-out infinite;
     }
-    .charging-bar {
+    .charging-bar-left {
       background: linear-gradient(90deg, 
         transparent 0%, 
-        rgba(16, 185, 129, 0.2) 30%, 
-        rgba(16, 185, 129, 0.4) 50%, 
-        rgba(16, 185, 129, 0.2) 70%, 
+        rgba(16, 185, 129, 0.15) 20%, 
+        rgba(16, 185, 129, 0.35) 50%, 
+        rgba(16, 185, 129, 0.15) 80%, 
         transparent 100%);
       background-size: 200% 100%;
-      animation: energy-flow 4s ease-in-out infinite;
+      animation: energy-flow-left 4s ease-in-out infinite;
+    }
+    .charging-bar-right {
+      background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(16, 185, 129, 0.15) 20%, 
+        rgba(16, 185, 129, 0.35) 50%, 
+        rgba(16, 185, 129, 0.15) 80%, 
+        transparent 100%);
+      background-size: 200% 100%;
+      animation: energy-flow-right 4s ease-in-out infinite;
     }
     @keyframes bolt-pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
@@ -162,13 +178,11 @@
     </div>
 
     <!-- Status and Telemetry Grid -->
-    <div id="chargeGridWrapper" class="relative mb-4 overflow-hidden rounded-xl">
-      <!-- Single unified charging animation bar spanning both cards -->
-      <div id="chargingBar" class="absolute inset-0 charging-bar opacity-0 pointer-events-none transition-opacity duration-500 z-20"></div>
-      
-      <div class="grid md:grid-cols-2 gap-4 relative z-10">
-        <!-- Status Card -->
-        <div id="statusCard" class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
+    <div class="grid md:grid-cols-2 gap-4 mb-4">
+      <!-- Status Card -->
+      <div id="statusCard" class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors relative overflow-hidden">
+        <div id="chargingBarLeft" class="absolute inset-0 charging-bar-left opacity-0 pointer-events-none transition-opacity duration-500"></div>
+        <div class="relative z-10">
           <div class="flex justify-between items-start mb-3">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 cursor-pointer select-none" ondblclick="toggleDemoMode()">
               Status
@@ -179,9 +193,12 @@
           <p class="text-xs text-gray-500 dark:text-gray-400 italic mb-3" id="lastUpdate">Last update: -</p>
           <div id="statusText" class="space-y-1"></div>
         </div>
+      </div>
 
-        <!-- Telemetry Card -->
-        <div id="telemetryCard" class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
+      <!-- Telemetry Card -->
+      <div id="telemetryCard" class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors relative overflow-hidden">
+        <div id="chargingBarRight" class="absolute inset-0 charging-bar-right opacity-0 pointer-events-none transition-opacity duration-500"></div>
+        <div class="relative z-10">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Telemetry</h2>
           <div id="telemetry" class="space-y-1"></div>
         </div>
@@ -236,19 +253,27 @@ function toggleDemoMode() {
 }
 
 function updateChargingAnimation(charging) {
-  const wrapper = document.getElementById('chargeGridWrapper');
-  const chargingBar = document.getElementById('chargingBar');
+  const statusCard = document.getElementById('statusCard');
+  const telemetryCard = document.getElementById('telemetryCard');
+  const chargingBarLeft = document.getElementById('chargingBarLeft');
+  const chargingBarRight = document.getElementById('chargingBarRight');
   const chargingBolt = document.getElementById('chargingBolt');
   
   if (charging) {
-    wrapper.classList.add('charging-active');
-    chargingBar.classList.remove('opacity-0');
-    chargingBar.classList.add('opacity-100');
+    statusCard.classList.add('charging-active');
+    telemetryCard.classList.add('charging-active');
+    chargingBarLeft.classList.remove('opacity-0');
+    chargingBarLeft.classList.add('opacity-100');
+    chargingBarRight.classList.remove('opacity-0');
+    chargingBarRight.classList.add('opacity-100');
     chargingBolt.classList.remove('hidden');
   } else {
-    wrapper.classList.remove('charging-active');
-    chargingBar.classList.add('opacity-0');
-    chargingBar.classList.remove('opacity-100');
+    statusCard.classList.remove('charging-active');
+    telemetryCard.classList.remove('charging-active');
+    chargingBarLeft.classList.add('opacity-0');
+    chargingBarLeft.classList.remove('opacity-100');
+    chargingBarRight.classList.add('opacity-0');
+    chargingBarRight.classList.remove('opacity-100');
     chargingBolt.classList.add('hidden');
   }
 }
