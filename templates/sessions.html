@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BS20 Sessions</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 16px; }
+    .card { padding: 14px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 12px; }
+    .muted { color:#666; font-size:14px; }
+    .big { font-size:20px; font-weight:600; }
+    .session { padding: 12px 0; border-bottom: 1px solid #eee; }
+    .session:last-child { border-bottom: none; }
+    button { padding:8px 16px; font-size:16px; border-radius:12px; border:1px solid #ccc; background:#fff; cursor:pointer; }
+    button:hover { background:#f5f5f5; }
+  </style>
+</head>
+<body>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h2 style="margin:0;">📋 All Sessions</h2>
+    <button onclick="location.href='/'">← Back</button>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    <div id="sessionsList" class="muted">Loading...</div>
+  </div>
+
+<script>
+let pricePerKwh = 0;  // loaded from settings
+let clockSettings = { clock_start: '23:00', clock_end: '07:00' };
+const CLOCK_DISCOUNT = 0.8;
+
+function fmtDate(isoStr){
+  if (!isoStr) return '?';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleString('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch(e) {
+    return isoStr;
+  }
+}
+
+function isMinuteInClock(minute) {
+  const [startH, startM] = clockSettings.clock_start.split(':').map(Number);
+  const [endH, endM] = clockSettings.clock_end.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  if (startMinutes <= endMinutes) {
+    return minute >= startMinutes && minute < endMinutes;
+  } else {
+    return minute >= startMinutes || minute < endMinutes;
+  }
+}
+
+function calcClockMinutes(startedAt, endedAt) {
+  const startDate = new Date(startedAt);
+  const endDate = endedAt ? new Date(endedAt) : new Date();
+
+  let clockMins = 0;
+  let nonClockMins = 0;
+
+  const current = new Date(startDate);
+  while (current < endDate) {
+    const jTime = new Date(current.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+    const minuteOfDay = jTime.getHours() * 60 + jTime.getMinutes();
+
+    if (isMinuteInClock(minuteOfDay)) {
+      clockMins++;
+    } else {
+      nonClockMins++;
+    }
+    current.setMinutes(current.getMinutes() + 1);
+  }
+
+  return { clockMins, nonClockMins };
+}
+
+function calcSessionCost(energyVal, startedAt, endedAt) {
+  if (energyVal <= 0) return 0;
+
+  const { clockMins, nonClockMins } = calcClockMinutes(startedAt, endedAt);
+  const totalMins = clockMins + nonClockMins;
+
+  if (totalMins === 0) return energyVal * pricePerKwh;
+
+  const clockEnergy = energyVal * (clockMins / totalMins);
+  const nonClockEnergy = energyVal * (nonClockMins / totalMins);
+
+  const clockCost = clockEnergy * pricePerKwh * CLOCK_DISCOUNT;
+  const nonClockCost = nonClockEnergy * pricePerKwh;
+
+  return clockCost + nonClockCost;
+}
+
+function fmtSession(s){
+  const start = fmtDate(s.started_at);
+  const ongoing = !s.ended_at;
+  const end = ongoing ? '⚡ ongoing' : fmtDate(s.ended_at);
+
+  let energyVal = 0;
+  if (s.session_energy_kwh != null) {
+    energyVal = s.session_energy_kwh;
+  } else if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
+    energyVal = s.end_amount_kwh - s.start_amount_kwh;
+  }
+  const energy = energyVal.toFixed(1) + ' kWh';
+  const cost = '₪' + calcSessionCost(energyVal, s.started_at, s.ended_at).toFixed(2);
+
+  const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
+
+  return `<div class="session">
+    <div><b>${energy}</b> · ${cost} · ${user}${ongoing ? ' 🔌' : ''}</div>
+    <div class="muted">${start} → ${end}</div>
+  </div>`;
+}
+
+async function loadSettings(){
+  try {
+    const r = await fetch('/api/settings');
+    if (!r.ok) return;
+    const s = await r.json();
+    pricePerKwh = s.price_per_kwh;
+    clockSettings.clock_start = s.clock_start || '23:00';
+    clockSettings.clock_end = s.clock_end || '07:00';
+  } catch(e) {}
+}
+
+async function loadSessions(){
+  try {
+    const r = await fetch('/api/sessions');
+    if (!r.ok) return;
+    const data = await r.json();
+    const list = data.sessions || [];
+    const el = document.getElementById('sessionsList');
+    if (!list.length) {
+      el.innerText = 'No sessions yet.';
+      return;
+    }
+    el.innerHTML = list.map(fmtSession).join('');
+  } catch(e) {
+    document.getElementById('sessionsList').innerText = 'Failed to load sessions.';
+  }
+}
+
+loadSettings().then(() => loadSessions());
+</script>
+
+</body>
+</html>
+

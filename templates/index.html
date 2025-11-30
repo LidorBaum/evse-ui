@@ -1,0 +1,441 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BS20 Control</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 16px; }
+    .card { padding: 14px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 12px; }
+    .row { display:flex; gap:10px; }
+    button { flex:1; padding:16px; font-size:18px; border-radius:12px; border:0; cursor:pointer; }
+    .start { background:#1db954; color:white; }
+    .stop { background:#ff4d4f; color:white; }
+    .muted { color:#666; font-size:14px; }
+    .big { font-size:20px; font-weight:600; }
+    input[type=range] { width:100%; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+    .kv { display:flex; justify-content:space-between; }
+  </style>
+</head>
+<body>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h2 style="margin:0;">BS20 Charger</h2>
+    <a href="/settings" style="font-size:24px; text-decoration:none;">⚙️</a>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    <div class="big">User</div>
+    <select id="userSelect" style="margin-top:8px; padding:8px; border-radius:8px; width:100%; font-size:16px;">
+    </select>
+    <div class="muted" style="margin-top:6px;">Selected user will be attached to new sessions.</div>
+  </div>
+
+  <div class="card" id="controlCard">
+    <div class="row" id="controlButtons">
+      <!-- Buttons rendered by JS based on clock hours -->
+    </div>
+    <div class="muted" id="clockModeNote" style="margin-top:8px;"></div>
+  </div>
+  <div class="card">
+    <div class="big">Max Amps: <span id="ampsVal">-</span>A</div>
+    <input id="amps" type="range" min="6" max="16" step="1"
+       oninput="ampsVal.innerText=this.value"
+       onchange="setAmps()" />
+  </div>
+
+  <div class="card">
+    <div class="big">Status</div>
+    <div class="muted" id="availability">...</div>
+    <div class="muted" id="lastUpdate" style="margin-top:4px;">Last update: -</div>
+    <div id="statusText"></div>
+  </div>
+
+  <div class="card">
+    <div class="big">Telemetry</div>
+    <div class="grid" id="telemetry"></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="big">History</div>
+      <button onclick="location.href='/sessions'" style="flex:none; margin:0; padding:6px 12px; font-size:14px; border:1px solid #ccc; background:#fff;">View All →</button>
+    </div>
+    <div id="history" class="muted" style="margin-top:8px;">No sessions yet.</div>
+  </div>
+
+<script>
+let isDragging = false;
+let debounceTimer = null;
+
+// optimistic lock
+let pendingAmps = null;
+let lockUntilTs = 0;  // timestamp ms until which we don't overwrite slider
+
+let clockSettings = { clock_start: '07:00', clock_end: '23:00' };
+let isCharging = false;
+let hasData = false;  // true once we receive first MQTT data
+
+function currentUser(){
+  const sel = document.getElementById('userSelect');
+  return sel ? sel.value : 'Unknown';
+}
+
+function isWithinClockHours(){
+  // Get current time in Jerusalem
+  const now = new Date();
+  const jerusalemTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+  const currentMinutes = jerusalemTime.getHours() * 60 + jerusalemTime.getMinutes();
+
+  const [startH, startM] = clockSettings.clock_start.split(':').map(Number);
+  const [endH, endM] = clockSettings.clock_end.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  if (startMinutes <= endMinutes) {
+    // Normal range (e.g. 07:00 - 23:00)
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  } else {
+    // Overnight range (e.g. 23:00 - 07:00)
+    return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+  }
+}
+
+function renderControlButtons(){
+  const container = document.getElementById('controlButtons');
+  const note = document.getElementById('clockModeNote');
+  const withinClock = isWithinClockHours();
+
+  if (!hasData) {
+    // No data yet – show disabled buttons
+    container.innerHTML = `
+      <button class="start" disabled style="opacity:0.5;cursor:not-allowed;">Start</button>
+      <button class="stop" disabled style="opacity:0.5;cursor:not-allowed;">Stop</button>
+    `;
+    note.innerText = '⏳ Waiting for charger data...';
+    return;
+  }
+
+  if (withinClock) {
+    // Clock mode: single toggle button (Stop toggles both)
+    const label = isCharging ? 'Stop ⏹️' : 'Start ▶️';
+    const cls = isCharging ? 'stop' : 'start';
+    container.innerHTML = `<button class="${cls}" onclick="post('/api/stop')" style="width:100%;">${label}</button>`;
+    note.innerText = '🕐 Clock mode active – toggle charging with one button';
+  } else {
+    // Normal mode: separate Start/Stop
+    container.innerHTML = `
+      <button class="start" onclick="startWithUser()">Start</button>
+      <button class="stop" onclick="post('/api/stop')">Stop</button>
+    `;
+    note.innerText = '';
+  }
+}
+
+async function post(url){
+  try{
+    const r = await fetch(url, {method:'POST'});
+    if(!r.ok) return false;
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+async function startWithUser(){
+  const user = encodeURIComponent(currentUser());
+  await post('/api/start_for/' + user);
+}
+
+async function setAmps(){
+  const v = Number(document.getElementById('amps').value);
+
+  // lock UI to this value for 4 seconds
+  pendingAmps = v;
+  lockUntilTs = Date.now() + 4000;
+
+  // send command
+  await post('/api/amps/' + v);
+
+  // after a bit, force a refresh
+  setTimeout(load, 800);
+}
+
+function kv(k,v){
+  return `<div class="kv"><div>${k}</div><div><b>${v}</b></div></div>`;
+}
+
+function fmtDate(isoStr){
+  if (!isoStr) return '?';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleString('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch(e) {
+    return isoStr;
+  }
+}
+
+let pricePerKwh = 0;  // loaded from settings
+const CLOCK_DISCOUNT = 0.8; // 20% off during clock hours
+
+// Check if a given minute-of-day is within clock hours
+function isMinuteInClock(minute) {
+  const [startH, startM] = clockSettings.clock_start.split(':').map(Number);
+  const [endH, endM] = clockSettings.clock_end.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  if (startMinutes <= endMinutes) {
+    return minute >= startMinutes && minute < endMinutes;
+  } else {
+    // Overnight range
+    return minute >= startMinutes || minute < endMinutes;
+  }
+}
+
+// Calculate minutes spent in clock vs non-clock for a session
+function calcClockMinutes(startedAt, endedAt) {
+  const startDate = new Date(startedAt);
+  const endDate = endedAt ? new Date(endedAt) : new Date();
+
+  let clockMins = 0;
+  let nonClockMins = 0;
+
+  // Iterate minute by minute (for accuracy across day boundaries)
+  const current = new Date(startDate);
+  while (current < endDate) {
+    // Get Jerusalem time for this minute
+    const jTime = new Date(current.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+    const minuteOfDay = jTime.getHours() * 60 + jTime.getMinutes();
+
+    if (isMinuteInClock(minuteOfDay)) {
+      clockMins++;
+    } else {
+      nonClockMins++;
+    }
+    current.setMinutes(current.getMinutes() + 1);
+  }
+
+  return { clockMins, nonClockMins };
+}
+
+function calcSessionCost(energyVal, startedAt, endedAt) {
+  if (energyVal <= 0) return 0;
+
+  const { clockMins, nonClockMins } = calcClockMinutes(startedAt, endedAt);
+  const totalMins = clockMins + nonClockMins;
+
+  if (totalMins === 0) return energyVal * pricePerKwh;
+
+  // Split energy proportionally by time
+  const clockEnergy = energyVal * (clockMins / totalMins);
+  const nonClockEnergy = energyVal * (nonClockMins / totalMins);
+
+  // Clock hours get 20% discount
+  const clockCost = clockEnergy * pricePerKwh * CLOCK_DISCOUNT;
+  const nonClockCost = nonClockEnergy * pricePerKwh;
+
+  return clockCost + nonClockCost;
+}
+
+function fmtSession(s){
+  const start = fmtDate(s.started_at);
+  const ongoing = !s.ended_at;
+  const end = ongoing ? '⚡ ongoing' : fmtDate(s.ended_at);
+
+  // Compute energy: prefer session_energy_kwh, else delta
+  let energyVal = 0;
+  if (s.session_energy_kwh != null) {
+    energyVal = s.session_energy_kwh;
+  } else if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
+    energyVal = s.end_amount_kwh - s.start_amount_kwh;
+  }
+  const energy = energyVal.toFixed(1) + ' kWh';
+  const cost = '₪' + calcSessionCost(energyVal, s.started_at, s.ended_at).toFixed(2);
+
+  const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
+
+  return `<div class="kv" style="margin-bottom:8px;">
+    <div style="flex:1;">
+      <div><b>${energy}</b> · ${cost} · ${user}${ongoing ? ' 🔌' : ''}</div>
+      <div style="font-size:12px;color:#888;">${start} → ${end}</div>
+    </div>
+  </div>`;
+}
+
+async function loadSessions(){
+  try{
+    const r = await fetch('/api/sessions');
+    if (!r.ok) return;
+    const data = await r.json();
+    const list = data.sessions || [];
+    const el = document.getElementById('history');
+    if (!list.length){
+      el.innerText = 'No sessions yet.';
+      return;
+    }
+    const recent = list.slice(0, 10);
+    el.innerHTML = recent.map(fmtSession).join('');
+  }catch(e){
+    // ignore
+  }
+}
+
+let lastUpdateTs = 0;
+
+function updateLastUpdateDisplay(){
+  const el = document.getElementById('lastUpdate');
+  if (!lastUpdateTs) {
+    el.innerText = 'Last update: -';
+    el.style.color = '#666';
+    return;
+  }
+  const agoSec = Math.round((Date.now() / 1000) - lastUpdateTs);
+  const stale = agoSec > 30;
+  el.innerText = 'Last update: ' + agoSec + 's ago';
+  el.style.color = stale ? '#ff4d4f' : '#1db954';
+}
+
+setInterval(updateLastUpdateDisplay, 1000);
+
+async function load(){
+  // don't fight user while dragging
+  if (isDragging) return;
+
+  const r = await fetch('/api/state');
+  const data = await r.json();
+
+  lastUpdateTs = data.last_update || 0;
+  updateLastUpdateDisplay();
+
+  document.getElementById('availability').innerText =
+    "BLE Bridge: " + (data.availability === 'online' ? 'Connected ✅' : 'Disconnected ❌');
+
+  const ch = data.charge || {};
+  const cfg = data.config || {};
+
+  const telemAmps = cfg.charge_amps;
+
+  // ✅ Only overwrite slider from telemetry if:
+  // - not dragging
+  // - and either no pending amps, or telemetry already matched it, or lock expired
+  const lockActive = pendingAmps !== null && Date.now() < lockUntilTs;
+  const telemMatchesPending = pendingAmps !== null && telemAmps === pendingAmps;
+
+  if (!lockActive || telemMatchesPending){
+    if (telemMatchesPending) pendingAmps = null; // unlock once matched
+    document.getElementById('amps').value = telemAmps ?? 16;
+    document.getElementById('ampsVal').innerText = telemAmps ?? '-';
+  } else {
+    // keep showing optimistic value
+    document.getElementById('amps').value = pendingAmps;
+    document.getElementById('ampsVal').innerText = pendingAmps;
+  }
+
+  // Track charging state for toggle button
+  const wasCharging = isCharging;
+  const hadData = hasData;
+  isCharging = (ch.output_state === 'Charging');
+  hasData = Object.keys(ch).length > 0;  // We have data if charge object is not empty
+
+  if (wasCharging !== isCharging || hadData !== hasData) {
+    renderControlButtons();
+  }
+
+  document.getElementById('statusText').innerHTML =
+    kv("Plug", ch.plug_state ?? '-') +
+    kv("State", ch.output_state ?? '-') +
+    kv("Errors", ch.error_details ?? '-') ;
+
+  function fmtPhase(v, a) {
+    if (v == null && a == null) return '-';
+    const vStr = v != null ? Math.round(v) + 'V' : '-';
+    const aStr = a != null ? Math.round(a) + 'A' : '-';
+    return vStr + ' ' + aStr;
+  }
+
+  function rssiToWord(rssi) {
+    if (rssi == null) return '-';
+    if (rssi >= -50) return 'Excellent';
+    if (rssi >= -70) return 'Good';
+    if (rssi >= -80) return 'Fair';
+    if (rssi >= -90) return 'Weak';
+    return 'Very Weak';
+  }
+
+  const t = [];
+  t.push(kv("L1", fmtPhase(ch.l1_voltage, ch.l1_amperage)));
+  t.push(kv("L2", fmtPhase(ch.l2_voltage, ch.l2_amperage)));
+  t.push(kv("L3", fmtPhase(ch.l3_voltage, ch.l3_amperage)));
+  t.push(kv("Charging Rate", ch.total_energy != null ? ch.total_energy + ' kW' : '-'));
+  t.push(kv("Inner °C", ch.inner_temp_c ?? '-'));
+  t.push(kv("Signal Strength", rssiToWord(cfg.rssi)));
+  document.getElementById('telemetry').innerHTML = t.join('');
+}
+
+// drag handlers
+const ampsEl = document.getElementById('amps');
+
+ampsEl.addEventListener('touchstart', () => { isDragging = true; });
+ampsEl.addEventListener('mousedown',  () => { isDragging = true; });
+
+function dragEnd(){
+  isDragging = false;
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(setAmps, 400); // send shortly after release
+}
+
+ampsEl.addEventListener('touchend', dragEnd);
+ampsEl.addEventListener('mouseup',  dragEnd);
+
+// update number live while dragging
+ampsEl.addEventListener('input', (e) => {
+  document.getElementById('ampsVal').innerText = e.target.value;
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(setAmps, 600); // debounce during drag
+});
+
+async function loadSettings(){
+  try {
+    const r = await fetch('/api/settings');
+    if (!r.ok) return;
+    const settings = await r.json();
+
+    // Update clock settings
+    clockSettings.clock_start = settings.clock_start || '07:00';
+    clockSettings.clock_end = settings.clock_end || '23:00';
+
+    // Update price
+    pricePerKwh = settings.price_per_kwh;
+
+    // Update users dropdown
+    const users = settings.users || ['Lidor', 'Bar'];
+    const sel = document.getElementById('userSelect');
+    sel.innerHTML = users.map(u => `<option value="${u}">${u}</option>`).join('');
+
+    // Re-render control buttons based on clock
+    renderControlButtons();
+  } catch(e) {}
+}
+
+// Load settings first, then load data
+loadSettings().then(() => {
+  load();
+  loadSessions();
+  renderControlButtons();
+});
+setInterval(load, 2000);
+setInterval(loadSessions, 15000);
+// Re-check clock hours every minute (in case time crosses boundary)
+setInterval(renderControlButtons, 60000);
+</script>
+
+</body>
+</html>
+

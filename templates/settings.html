@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BS20 Settings</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 16px; }
+    .card { padding: 14px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 12px; }
+    .muted { color:#666; font-size:14px; }
+    .big { font-size:20px; font-weight:600; }
+    input, select { padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px; width:100%; box-sizing:border-box; margin-top:8px; }
+    button { padding:14px 24px; font-size:16px; border-radius:12px; border:1px solid #ccc; background:#fff; cursor:pointer; margin-top:12px; }
+    button:hover { background:#f5f5f5; }
+    .btn-primary { background:#1677ff; color:#fff; border:none; }
+    .btn-primary:hover { background:#4096ff; }
+    .row { display:flex; gap:10px; align-items:center; }
+  </style>
+</head>
+<body>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h2 style="margin:0;">⚙️ Settings</h2>
+    <button onclick="location.href='/'" style="margin:0; padding:8px 16px;">← Back</button>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    <div class="big">Clock Hours</div>
+    <div class="muted">Charging schedule window (used by charger timer feature)</div>
+    <div class="row" style="margin-top:12px;">
+      <div style="flex:1;">
+        <label class="muted">Start</label>
+        <input type="time" id="clockStart" />
+      </div>
+      <div style="flex:1;">
+        <label class="muted">End</label>
+        <input type="time" id="clockEnd" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="big">Users</div>
+    <div class="muted">Comma-separated list of user names for the dropdown</div>
+    <input type="text" id="usersList" placeholder="Lidor, Bar" />
+  </div>
+
+  <div class="card">
+    <div class="big">Price per kWh</div>
+    <div class="muted">Electricity rate for cost estimation (₪)</div>
+    <input type="number" id="pricePerKwh" step="0.01" min="0" />
+  </div>
+
+  <div class="card">
+    <div class="big">Bluetooth Control</div>
+    <div class="muted">Pause BLE bridge to connect with phone app</div>
+    <button onclick="pauseBle(60)" style="margin-top:12px; width:100%;">Pause 60s</button>
+    <div class="muted" id="pauseNote" style="margin-top:8px;"></div>
+  </div>
+
+  <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
+  <div id="status" class="muted" style="margin-top:12px;"></div>
+
+<script>
+async function loadSettings(){
+  try {
+    const r = await fetch('/api/settings');
+    if (!r.ok) return;
+    const s = await r.json();
+    document.getElementById('clockStart').value = s.clock_start || '06:00';
+    document.getElementById('clockEnd').value = s.clock_end || '23:00';
+    document.getElementById('usersList').value = (s.users || []).join(', ');
+    document.getElementById('pricePerKwh').value = s.price_per_kwh;
+  } catch(e) {}
+}
+
+async function pauseBle(sec){
+  try {
+    const r = await fetch('/api/pause_ble/' + sec, {method: 'POST'});
+    if (r.ok) {
+      document.getElementById('pauseNote').innerText =
+        "BLE paused for " + sec + "s. You can connect with your phone app now.";
+    }
+  } catch(e) {}
+}
+
+async function saveSettings(){
+  const clockStart = document.getElementById('clockStart').value;
+  const clockEnd = document.getElementById('clockEnd').value;
+  const usersRaw = document.getElementById('usersList').value;
+  const users = usersRaw.split(',').map(u => u.trim()).filter(u => u.length > 0);
+  const pricePerKwh = parseFloat(document.getElementById('pricePerKwh').value) || 0;
+
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        clock_start: clockStart,
+        clock_end: clockEnd,
+        users: users,
+        price_per_kwh: pricePerKwh
+      })
+    });
+    if (r.ok) {
+      window.location.href = '/';
+    } else {
+      document.getElementById('status').innerText = '❌ Failed to save';
+      document.getElementById('status').style.color = '#ff4d4f';
+    }
+  } catch(e) {
+    document.getElementById('status').innerText = '❌ Error: ' + e.message;
+    document.getElementById('status').style.color = '#ff4d4f';
+  }
+}
+
+loadSettings();
+</script>
+
+</body>
+</html>
+
