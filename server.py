@@ -765,10 +765,12 @@ async function loadSettings(){
   } catch(e) {}
 }
 
-loadSettings();
-load();
-loadSessions();
-renderControlButtons();
+// Load settings first, then load data
+loadSettings().then(() => {
+  load();
+  loadSessions();
+  renderControlButtons();
+});
 setInterval(load, 2000);
 setInterval(loadSessions, 15000);
 // Re-check clock hours every minute (in case time crosses boundary)
