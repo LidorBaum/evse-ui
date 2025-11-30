@@ -96,6 +96,14 @@
       <p class="text-sm text-emerald-600 dark:text-emerald-400 mt-2" id="pauseNote"></p>
     </div>
 
+    <!-- Telegram Notifications -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Telegram Notifications</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Get notified when charging starts, ends, or errors occur</p>
+      <button onclick="testTelegram(this)" class="mt-3 w-full py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer">Send Test Message 📬</button>
+      <p class="text-sm mt-2" id="telegramNote"></p>
+    </div>
+
     <!-- Save Button -->
     <button onclick="saveSettings()" class="w-full py-3 px-4 rounded-xl font-bold text-white bg-emerald-500 hover:bg-emerald-600 transition cursor-pointer">Save Settings</button>
     <p class="text-sm text-center mt-3" id="status"></p>
@@ -130,6 +138,32 @@ async function pauseBle(sec){
         "BLE paused for " + sec + "s. You can connect with your phone app now.";
     }
   } catch(e) {}
+}
+
+async function testTelegram(btn){
+  const noteEl = document.getElementById('telegramNote');
+  btn.classList.add('btn-loading');
+  btn.disabled = true;
+  noteEl.innerText = '';
+  
+  try {
+    const r = await fetch('/api/telegram/test', {method: 'POST'});
+    const data = await r.json();
+    
+    if (data.ok) {
+      noteEl.innerText = '✅ Message sent! Check your Telegram.';
+      noteEl.className = 'text-sm mt-2 text-emerald-600 dark:text-emerald-400';
+    } else {
+      noteEl.innerText = '⚠️ ' + (data.error || 'Telegram not configured. Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to .env');
+      noteEl.className = 'text-sm mt-2 text-amber-600 dark:text-amber-400';
+    }
+  } catch(e) {
+    noteEl.innerText = '❌ Failed to send test message';
+    noteEl.className = 'text-sm mt-2 text-red-500';
+  }
+  
+  btn.classList.remove('btn-loading');
+  btn.disabled = false;
 }
 
 async function saveSettings(){

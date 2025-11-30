@@ -475,6 +475,28 @@ def api_pause_ble(seconds: int):
     return {"ok": True, "paused_for": seconds}
 
 
+@app.post("/api/telegram/test")
+def api_telegram_test():
+    """Send a test message to Telegram."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return {"ok": False, "error": "Telegram not configured"}
+    
+    import random
+    messages = [
+        "🚗⚡ Beep boop! Your MG4 says hi! It's dreaming of electrons...",
+        "🔌 Testing 1, 2, 3... Is this thing on? Your charger is ready to party!",
+        "⚡ Shocking news! Your Telegram notifications are working! 🎉",
+        "🔋 Your car whispered: 'Feed me electrons!' - Notification test successful!",
+        "🚀 Houston, we have connection! Your charger is online and feeling electric!",
+        "⚡ Plot twist: Your charger just sent you a message. Mind = blown! 🤯",
+        "🔌 Your MG4 wanted to say: 'I love you more than gasoline!' 💚",
+        "🎮 Achievement unlocked: Telegram notifications configured! +100 EV points!",
+    ]
+    message = random.choice(messages)
+    _send_telegram(message)
+    return {"ok": True, "message": message}
+
+
 @app.post("/api/start")
 def api_start():
     # Backwards‑compat: start without explicit user (records as "Unknown")
