@@ -168,6 +168,7 @@ function renderStats(sessions) {
   let monthSessions = 0;
   let totalDuration = 0;
   let biggestSession = 0;
+  let biggestSessionUser = '';
 
   sessions.forEach(s => {
     const energy = getSessionEnergy(s);
@@ -178,7 +179,10 @@ function renderStats(sessions) {
     totalKwh += energy;
     totalCost += cost;
     totalDuration += duration;
-    if (energy > biggestSession) biggestSession = energy;
+    if (energy > biggestSession) {
+      biggestSession = energy;
+      biggestSessionUser = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
+    }
 
     if (monthKey === currentMonthKey) {
       monthKwh += energy;
@@ -218,7 +222,7 @@ function renderStats(sessions) {
       </div>
     </div>
     <div style="text-align:center; margin-top:8px; padding:8px; background:#fff3cd; border-radius:8px;">
-      🏆 <b>Biggest charge:</b> ${biggestSession.toFixed(1)} kWh
+      🏆 <b>Biggest charge:</b> ${biggestSession.toFixed(1)} kWh by ${biggestSessionUser}
     </div>
   `;
 }
