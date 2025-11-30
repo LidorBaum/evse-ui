@@ -162,12 +162,13 @@
     </div>
 
     <!-- Status and Telemetry Grid -->
-    <div class="grid md:grid-cols-2 gap-4 mb-4">
-      <!-- Status Card -->
-      <div id="statusCard" class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors relative overflow-hidden">
-        <!-- Charging animation bar -->
-        <div id="chargingBar" class="absolute inset-0 charging-bar opacity-0 pointer-events-none transition-opacity duration-500"></div>
-        <div class="relative z-10">
+    <div id="chargeGridWrapper" class="relative mb-4 overflow-hidden rounded-xl">
+      <!-- Single unified charging animation bar spanning both cards -->
+      <div id="chargingBar" class="absolute inset-0 charging-bar opacity-0 pointer-events-none transition-opacity duration-500 z-20"></div>
+      
+      <div class="grid md:grid-cols-2 gap-4 relative z-10">
+        <!-- Status Card -->
+        <div id="statusCard" class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
           <div class="flex justify-between items-start mb-3">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 cursor-pointer select-none" ondblclick="toggleDemoMode()">
               Status
@@ -178,13 +179,9 @@
           <p class="text-xs text-gray-500 dark:text-gray-400 italic mb-3" id="lastUpdate">Last update: -</p>
           <div id="statusText" class="space-y-1"></div>
         </div>
-      </div>
 
-      <!-- Telemetry Card -->
-      <div id="telemetryCard" class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors relative overflow-hidden">
-        <!-- Charging animation bar (synced with Status) -->
-        <div id="chargingBarTelemetry" class="absolute inset-0 charging-bar opacity-0 pointer-events-none transition-opacity duration-500"></div>
-        <div class="relative z-10">
+        <!-- Telemetry Card -->
+        <div id="telemetryCard" class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Telemetry</h2>
           <div id="telemetry" class="space-y-1"></div>
         </div>
@@ -239,27 +236,19 @@ function toggleDemoMode() {
 }
 
 function updateChargingAnimation(charging) {
-  const statusCard = document.getElementById('statusCard');
-  const telemetryCard = document.getElementById('telemetryCard');
+  const wrapper = document.getElementById('chargeGridWrapper');
   const chargingBar = document.getElementById('chargingBar');
-  const chargingBarTelemetry = document.getElementById('chargingBarTelemetry');
   const chargingBolt = document.getElementById('chargingBolt');
   
   if (charging) {
-    statusCard.classList.add('charging-active');
-    telemetryCard.classList.add('charging-active');
+    wrapper.classList.add('charging-active');
     chargingBar.classList.remove('opacity-0');
     chargingBar.classList.add('opacity-100');
-    chargingBarTelemetry.classList.remove('opacity-0');
-    chargingBarTelemetry.classList.add('opacity-100');
     chargingBolt.classList.remove('hidden');
   } else {
-    statusCard.classList.remove('charging-active');
-    telemetryCard.classList.remove('charging-active');
+    wrapper.classList.remove('charging-active');
     chargingBar.classList.add('opacity-0');
     chargingBar.classList.remove('opacity-100');
-    chargingBarTelemetry.classList.add('opacity-0');
-    chargingBarTelemetry.classList.remove('opacity-100');
     chargingBolt.classList.add('hidden');
   }
 }
