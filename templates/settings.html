@@ -50,6 +50,12 @@
   </div>
 
   <div class="card">
+    <div class="big">Battery Capacity</div>
+    <div class="muted">Car battery size in kWh (for charging calculator)</div>
+    <input type="number" id="batteryCapacity" step="0.1" min="0" placeholder="64" />
+  </div>
+
+  <div class="card">
     <div class="big">Bluetooth Control</div>
     <div class="muted">Pause BLE bridge to connect with phone app</div>
     <button onclick="pauseBle(60)" style="margin-top:12px; width:100%;">Pause 60s</button>
@@ -69,6 +75,7 @@ async function loadSettings(){
     document.getElementById('clockEnd').value = s.clock_end || '23:00';
     document.getElementById('usersList').value = (s.users || []).join(', ');
     document.getElementById('pricePerKwh').value = s.price_per_kwh;
+    document.getElementById('batteryCapacity').value = s.battery_capacity_kwh || 64;
   } catch(e) {}
 }
 
@@ -88,6 +95,7 @@ async function saveSettings(){
   const usersRaw = document.getElementById('usersList').value;
   const users = usersRaw.split(',').map(u => u.trim()).filter(u => u.length > 0);
   const pricePerKwh = parseFloat(document.getElementById('pricePerKwh').value) || 0;
+  const batteryCapacity = parseFloat(document.getElementById('batteryCapacity').value) || 64;
 
   try {
     const r = await fetch('/api/settings', {
@@ -97,7 +105,8 @@ async function saveSettings(){
         clock_start: clockStart,
         clock_end: clockEnd,
         users: users,
-        price_per_kwh: pricePerKwh
+        price_per_kwh: pricePerKwh,
+        battery_capacity_kwh: batteryCapacity
       })
     });
     if (r.ok) {

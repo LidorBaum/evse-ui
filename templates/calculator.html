@@ -1,0 +1,171 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Charging Calculator</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 16px; }
+    .card { padding: 14px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 12px; }
+    .muted { color:#666; font-size:14px; }
+    .big { font-size:20px; font-weight:600; }
+    input { padding:12px; border-radius:8px; border:1px solid #ccc; font-size:16px; width:100%; box-sizing:border-box; margin-top:8px; }
+    button { padding:14px 24px; font-size:16px; border-radius:12px; border:1px solid #ccc; background:#fff; cursor:pointer; margin-top:12px; width:100%; }
+    button:hover { background:#f5f5f5; }
+    .btn-primary { background:#1677ff; color:#fff; border:none; }
+    .btn-primary:hover { background:#4096ff; }
+    .result { margin-top:16px; padding:16px; background:#f0fdf4; border-radius:12px; text-align:center; display:none; }
+    .result.error { background:#fef2f2; }
+    .result-value { font-size:32px; font-weight:700; color:#1db954; }
+    .result.error .result-value { color:#ff4d4f; }
+    .result-label { font-size:14px; color:#666; margin-top:4px; }
+    .info-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #eee; }
+    .info-row:last-child { border-bottom:none; }
+  </style>
+</head>
+<body>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h2 style="margin:0;">🔌 Charging Calculator</h2>
+    <button onclick="location.href='/'" style="width:auto; margin:0; padding:8px 16px;">← Back</button>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    <label class="muted">Current Battery %</label>
+    <input type="number" id="currentPercent" min="0" max="100" value="20" inputmode="numeric" />
+  </div>
+
+  <div class="card">
+    <label class="muted">Target Battery %</label>
+    <input type="number" id="targetPercent" min="0" max="100" value="80" inputmode="numeric" />
+  </div>
+
+  <div class="card">
+    <label class="muted">Time Available (hours)</label>
+    <input type="number" id="availableHours" min="0" step="0.5" value="4" inputmode="decimal" />
+  </div>
+
+  <div class="card">
+    <label class="muted">Balancing Time (minutes)</label>
+    <input type="number" id="balancingMinutes" min="0" value="0" inputmode="numeric" />
+    <div class="muted" style="margin-top:6px;">Time the car pauses for cell balancing</div>
+  </div>
+
+  <button class="btn-primary" onclick="calculate()">Calculate</button>
+
+  <div class="result" id="result">
+    <div class="result-value" id="resultValue">-</div>
+    <div class="result-label" id="resultLabel">Recommended Amps</div>
+  </div>
+
+  <div class="card" id="detailsCard" style="display:none;">
+    <div class="big">📊 Details</div>
+    <div style="margin-top:12px;">
+      <div class="info-row">
+        <span class="muted">Battery Capacity</span>
+        <span id="detailCapacity">-</span>
+      </div>
+      <div class="info-row">
+        <span class="muted">Energy Needed</span>
+        <span id="detailEnergy">-</span>
+      </div>
+      <div class="info-row">
+        <span class="muted">Actual Charging Time</span>
+        <span id="detailTime">-</span>
+      </div>
+      <div class="info-row">
+        <span class="muted">Required Power</span>
+        <span id="detailPower">-</span>
+      </div>
+    </div>
+  </div>
+
+<script>
+let batteryCapacity = 64; // Default, loaded from settings
+const VOLTAGE = 230; // Volts per phase
+const PHASES = 3;
+
+async function loadSettings() {
+  try {
+    const r = await fetch('/api/settings');
+    if (!r.ok) return;
+    const s = await r.json();
+    batteryCapacity = s.battery_capacity_kwh || 64;
+  } catch(e) {}
+}
+
+function calculate() {
+  const currentPercent = parseFloat(document.getElementById('currentPercent').value) || 0;
+  const targetPercent = parseFloat(document.getElementById('targetPercent').value) || 80;
+  const availableHours = parseFloat(document.getElementById('availableHours').value) || 0;
+  const balancingMinutes = parseFloat(document.getElementById('balancingMinutes').value) || 0;
+
+  const resultEl = document.getElementById('result');
+  const resultValue = document.getElementById('resultValue');
+  const resultLabel = document.getElementById('resultLabel');
+  const detailsCard = document.getElementById('detailsCard');
+
+  // Validation
+  if (targetPercent <= currentPercent) {
+    resultEl.style.display = 'block';
+    resultEl.className = 'result error';
+    resultValue.innerText = '⚠️';
+    resultLabel.innerText = 'Target must be higher than current %';
+    detailsCard.style.display = 'none';
+    return;
+  }
+
+  // Calculate
+  const percentNeeded = targetPercent - currentPercent;
+  const energyNeeded = (percentNeeded / 100) * batteryCapacity; // kWh
+  const actualChargingHours = availableHours - (balancingMinutes / 60);
+
+  if (actualChargingHours <= 0) {
+    resultEl.style.display = 'block';
+    resultEl.className = 'result error';
+    resultValue.innerText = '⚠️';
+    resultLabel.innerText = 'Not enough time after balancing';
+    detailsCard.style.display = 'none';
+    return;
+  }
+
+  const requiredPowerKw = energyNeeded / actualChargingHours;
+  
+  // For 3-phase: P = √3 × V × I × cos(φ) ≈ 1.73 × 230 × I × 1
+  // So I = P / (1.73 × 230) = P / 398 (in watts)
+  // Or for kW: I = P_kW × 1000 / 398
+  const requiredAmps = (requiredPowerKw * 1000) / (Math.sqrt(3) * VOLTAGE);
+
+  // Show result
+  resultEl.style.display = 'block';
+  resultEl.className = 'result';
+  
+  if (requiredAmps > 16) {
+    resultEl.className = 'result error';
+    resultValue.innerText = requiredAmps.toFixed(1) + ' A';
+    resultLabel.innerText = '⚠️ Exceeds max 16A - need more time!';
+  } else if (requiredAmps < 6) {
+    resultValue.innerText = '6 A';
+    resultLabel.innerText = 'Minimum 6A (will finish early)';
+  } else {
+    resultValue.innerText = Math.ceil(requiredAmps) + ' A';
+    resultLabel.innerText = 'Recommended Setting';
+  }
+
+  // Show details
+  detailsCard.style.display = 'block';
+  document.getElementById('detailCapacity').innerText = batteryCapacity + ' kWh';
+  document.getElementById('detailEnergy').innerText = energyNeeded.toFixed(1) + ' kWh';
+  document.getElementById('detailTime').innerText = actualChargingHours.toFixed(1) + ' hours';
+  document.getElementById('detailPower').innerText = requiredPowerKw.toFixed(2) + ' kW';
+}
+
+// Auto-calculate on input change
+document.querySelectorAll('input').forEach(input => {
+  input.addEventListener('input', calculate);
+});
+
+loadSettings().then(() => calculate());
+</script>
+
+</body>
+</html>
+

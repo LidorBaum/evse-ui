@@ -73,6 +73,7 @@ def _load_settings() -> dict:
         "clock_end": "23:00",
         "users": ["Lidor", "Bar"],
         "price_per_kwh": 0.55,
+        "battery_capacity_kwh": 64.0,  # MG4 default
     }
     needs_save = False
 
@@ -370,6 +371,11 @@ def api_post_settings(new_settings: dict):
             app_settings["price_per_kwh"] = float(new_settings["price_per_kwh"])
         except (TypeError, ValueError):
             pass
+    if "battery_capacity_kwh" in new_settings:
+        try:
+            app_settings["battery_capacity_kwh"] = float(new_settings["battery_capacity_kwh"])
+        except (TypeError, ValueError):
+            pass
     _save_settings(app_settings)
     return {"ok": True, "settings": app_settings}
 
@@ -484,4 +490,13 @@ def sessions_page(evse_auth: str | None = Cookie(default=None)):
     if redirect:
         return redirect
     html = _read_template("sessions.html")
+    return HTMLResponse(html)
+
+
+@app.get("/calculator")
+def calculator_page(evse_auth: str | None = Cookie(default=None)):
+    redirect = _check_auth(evse_auth)
+    if redirect:
+        return redirect
+    html = _read_template("calculator.html")
     return HTMLResponse(html)
