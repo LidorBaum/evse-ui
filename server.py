@@ -1,14 +1,45 @@
+import hashlib
 import json
 import os
+import secrets
 import subprocess
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import Cookie, FastAPI, Response
+from fastapi.responses import HTMLResponse, RedirectResponse
 from paho.mqtt import client as mqtt
+
+# ---- Auth config ----
+AUTH_PIN = os.getenv("AUTH_PIN", "1234")
+AUTH_COOKIE_NAME = "evse_auth"
+AUTH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60  # 7 days in seconds
+
+# Generate a secret for signing tokens (persists across restarts via file)
+AUTH_SECRET_FILE = ".auth_secret"
+def _get_auth_secret() -> str:
+    if os.path.exists(AUTH_SECRET_FILE):
+        with open(AUTH_SECRET_FILE, "r") as f:
+            return f.read().strip()
+    secret = secrets.token_hex(32)
+    with open(AUTH_SECRET_FILE, "w") as f:
+        f.write(secret)
+    return secret
+
+AUTH_SECRET = _get_auth_secret()
+
+def _generate_auth_token() -> str:
+    """Generate a signed auth token."""
+    data = f"{AUTH_PIN}:{AUTH_SECRET}"
+    return hashlib.sha256(data.encode()).hexdigest()
+
+def _verify_auth_token(token: str | None) -> bool:
+    """Verify the auth token from cookie."""
+    if not token:
+        return False
+    return token == _generate_auth_token()
 
 SERIAL = "0166341352572539"
 BASE = f"evseMQTT/{SERIAL}"
@@ -398,19 +429,56 @@ def _read_template(name: str) -> str:
         return f.read()
 
 
+def _check_auth(evse_auth: str | None):
+    """Check if user is authenticated, return redirect if not."""
+    if not _verify_auth_token(evse_auth):
+        return RedirectResponse(url="/login", status_code=302)
+    return None
+
+
+@app.get("/login")
+def login_page():
+    html = _read_template("login.html")
+    return HTMLResponse(html)
+
+
+@app.post("/api/login")
+def api_login(response: Response, pin: str):
+    if pin == AUTH_PIN:
+        token = _generate_auth_token()
+        response.set_cookie(
+            key=AUTH_COOKIE_NAME,
+            value=token,
+            max_age=AUTH_COOKIE_MAX_AGE,
+            httponly=True,
+            samesite="strict",
+        )
+        return {"ok": True}
+    return {"ok": False, "error": "Invalid PIN"}
+
+
 @app.get("/")
-def ui():
+def ui(evse_auth: str | None = Cookie(default=None)):
+    redirect = _check_auth(evse_auth)
+    if redirect:
+        return redirect
     html = _read_template("index.html")
     return HTMLResponse(html)
 
 
 @app.get("/settings")
-def settings_page():
+def settings_page(evse_auth: str | None = Cookie(default=None)):
+    redirect = _check_auth(evse_auth)
+    if redirect:
+        return redirect
     html = _read_template("settings.html")
     return HTMLResponse(html)
 
 
 @app.get("/sessions")
-def sessions_page():
+def sessions_page(evse_auth: str | None = Cookie(default=None)):
+    redirect = _check_auth(evse_auth)
+    if redirect:
+        return redirect
     html = _read_template("sessions.html")
     return HTMLResponse(html)
