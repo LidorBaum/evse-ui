@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sessions - MG4 Charger</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     tailwind.config = { darkMode: 'class' }
   </script>
@@ -49,6 +50,21 @@
       <div id="stats"></div>
     </div>
 
+    <!-- Charts -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">📈 Charts</h2>
+        <div class="flex gap-2">
+          <button onclick="setChartView('cost')" id="chartBtnCost" class="text-xs px-3 py-1 rounded-lg bg-emerald-500 text-white">Cost</button>
+          <button onclick="setChartView('energy')" id="chartBtnEnergy" class="text-xs px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300">Energy</button>
+          <button onclick="setChartView('sessions')" id="chartBtnSessions" class="text-xs px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300">Sessions</button>
+        </div>
+      </div>
+      <div class="relative h-64">
+        <canvas id="mainChart"></canvas>
+      </div>
+    </div>
+
     <!-- Monthly Breakdown -->
     <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
       <div class="flex justify-between items-center">
@@ -67,10 +83,11 @@
 
 <script>
 // Dark mode init
-(function() {
+const isDarkMode = (function() {
   const isDark = localStorage.getItem('darkMode') === 'true' || 
     (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches);
   if (isDark) document.documentElement.classList.add('dark');
+  return isDark;
 })();
 
 let pricePerKwh = 0;
@@ -78,6 +95,8 @@ let clockSettings = { clock_start: '23:00', clock_end: '07:00' };
 const CLOCK_DISCOUNT = 0.8;
 let allSessions = [];
 let selectedUser = '';
+let mainChart = null;
+let currentChartView = 'cost';
 
 function fmtDate(isoStr){
   if (!isoStr) return '?';
@@ -199,6 +218,159 @@ function getMonthName(monthKey) {
   const [year, month] = monthKey.split('-');
   const d = new Date(year, parseInt(month) - 1, 1);
   return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function getMonthShortName(monthKey) {
+  const [year, month] = monthKey.split('-');
+  const d = new Date(year, parseInt(month) - 1, 1);
+  return d.toLocaleString('en-US', { month: 'short' });
+}
+
+// Chart functions
+function getChartData(sessions) {
+  const months = {};
+  
+  sessions.forEach(s => {
+    const monthKey = getMonthKey(s.started_at);
+    if (!monthKey) return;
+    
+    if (!months[monthKey]) {
+      months[monthKey] = { kwh: 0, cost: 0, count: 0 };
+    }
+    
+    const energy = getSessionEnergy(s);
+    const cost = calcSessionCost(energy, s.started_at, s.ended_at);
+    
+    months[monthKey].kwh += energy;
+    months[monthKey].cost += cost;
+    months[monthKey].count++;
+  });
+  
+  // Sort by month and get last 12 months
+  const sortedKeys = Object.keys(months).sort().slice(-12);
+  
+  return {
+    labels: sortedKeys.map(k => getMonthShortName(k)),
+    cost: sortedKeys.map(k => months[k].cost),
+    energy: sortedKeys.map(k => months[k].kwh),
+    sessions: sortedKeys.map(k => months[k].count)
+  };
+}
+
+function setChartView(view) {
+  currentChartView = view;
+  
+  // Update button styles
+  ['cost', 'energy', 'sessions'].forEach(v => {
+    const btn = document.getElementById('chartBtn' + v.charAt(0).toUpperCase() + v.slice(1));
+    if (v === view) {
+      btn.className = 'text-xs px-3 py-1 rounded-lg bg-emerald-500 text-white';
+    } else {
+      btn.className = 'text-xs px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300';
+    }
+  });
+  
+  renderChart(getFilteredSessions());
+}
+
+function renderChart(sessions) {
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  const data = getChartData(sessions);
+  const isDark = document.documentElement.classList.contains('dark');
+  
+  const configs = {
+    cost: {
+      label: 'Cost (₪)',
+      data: data.cost,
+      backgroundColor: 'rgba(16, 185, 129, 0.8)',
+      borderColor: 'rgb(16, 185, 129)',
+      prefix: '₪',
+      suffix: ''
+    },
+    energy: {
+      label: 'Energy (kWh)',
+      data: data.energy,
+      backgroundColor: 'rgba(59, 130, 246, 0.8)',
+      borderColor: 'rgb(59, 130, 246)',
+      prefix: '',
+      suffix: ' kWh'
+    },
+    sessions: {
+      label: 'Sessions',
+      data: data.sessions,
+      backgroundColor: 'rgba(168, 85, 247, 0.8)',
+      borderColor: 'rgb(168, 85, 247)',
+      prefix: '',
+      suffix: ''
+    }
+  };
+  
+  const config = configs[currentChartView];
+  
+  if (mainChart) {
+    mainChart.destroy();
+  }
+  
+  mainChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label: config.label,
+        data: config.data,
+        backgroundColor: config.backgroundColor,
+        borderColor: config.borderColor,
+        borderWidth: 2,
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: isDark ? '#374151' : '#fff',
+          titleColor: isDark ? '#fff' : '#111827',
+          bodyColor: isDark ? '#d1d5db' : '#4b5563',
+          borderColor: isDark ? '#4b5563' : '#e5e7eb',
+          borderWidth: 1,
+          padding: 12,
+          cornerRadius: 8,
+          callbacks: {
+            label: function(context) {
+              return config.prefix + context.raw.toFixed(currentChartView === 'sessions' ? 0 : 1) + config.suffix;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false
+          },
+          ticks: {
+            color: isDark ? '#9ca3af' : '#6b7280'
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: isDark ? '#374151' : '#f3f4f6'
+          },
+          ticks: {
+            color: isDark ? '#9ca3af' : '#6b7280',
+            callback: function(value) {
+              return config.prefix + value + (currentChartView === 'energy' ? '' : '');
+            }
+          }
+        }
+      }
+    }
+  });
 }
 
 function renderStats(sessions) {
@@ -388,6 +560,7 @@ function applyFilter() {
   setTimeout(() => {
     renderStats(filtered);
     renderMonthlyBreakdown(filtered);
+    renderChart(filtered);
     
     if (!filtered.length) {
       document.getElementById('sessionsList').innerHTML = '<div class="text-gray-500 dark:text-gray-400">No sessions for this user.</div>';
