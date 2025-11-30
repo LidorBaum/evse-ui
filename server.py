@@ -564,8 +564,8 @@ def api_telegram_test():
     return {"ok": True, "message": message}
 
 
-def _send_telegram_file(file_path: str, caption: str = ""):
-    """Send a file via Telegram bot (blocking)."""
+def _send_telegram_file(file_path: str, caption: str = "", silent: bool = True):
+    """Send a file via Telegram bot (blocking). Silent mode disables notification sound."""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return False, "Telegram not configured"
     
@@ -596,6 +596,13 @@ def _send_telegram_file(file_path: str, caption: str = ""):
                 f'--{boundary}\r\n'
                 f'Content-Disposition: form-data; name="caption"\r\n\r\n'
                 f'{caption}\r\n'
+            )
+        
+        if silent:
+            body += (
+                f'--{boundary}\r\n'
+                f'Content-Disposition: form-data; name="disable_notification"\r\n\r\n'
+                f'true\r\n'
             )
         
         body += f'--{boundary}--\r\n'
