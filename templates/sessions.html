@@ -22,31 +22,37 @@
 </head>
 <body>
   <div style="display:flex; justify-content:space-between; align-items:center;">
-    <h2 style="margin:0;">📋 All Sessions</h2>
-    <button onclick="location.href='/'">← Back</button>
-  </div>
-
-  <div class="card" style="margin-top:12px;">
-    <div class="big">📊 Summary</div>
-    <div id="stats" class="muted" style="margin-top:12px;">Loading...</div>
-  </div>
-
-  <div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div class="big">📅 Monthly Breakdown</div>
-      <button onclick="toggleMonths()" id="monthsToggle" style="padding:4px 10px; font-size:13px;">Show</button>
-    </div>
-    <div id="monthlyBreakdown" style="display:none; margin-top:12px;"></div>
-  </div>
-
-  <div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div class="big">🔋 Sessions</div>
+    <h2 style="margin:0;">📋 Sessions</h2>
+    <div style="display:flex; gap:8px; align-items:center;">
       <select id="userFilter" onchange="applyFilter()" style="padding:6px 12px; border-radius:8px; border:1px solid #ccc; font-size:14px;">
         <option value="">All Users</option>
       </select>
+      <button onclick="location.href='/'">← Back</button>
     </div>
-    <div id="sessionsList" class="muted" style="margin-top:12px;">Loading...</div>
+  </div>
+
+  <div id="loadingState" style="text-align:center; padding:40px; color:#666;">
+    ⏳ Loading sessions...
+  </div>
+
+  <div id="contentArea" style="display:none;">
+    <div class="card" style="margin-top:12px;">
+      <div class="big">📊 Summary</div>
+      <div id="stats" class="muted" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="big">📅 Monthly Breakdown</div>
+        <button onclick="toggleMonths()" id="monthsToggle" style="padding:4px 10px; font-size:13px;">Show</button>
+      </div>
+      <div id="monthlyBreakdown" style="display:none; margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="big">🔋 All Sessions</div>
+      <div id="sessionsList" class="muted" style="margin-top:12px;"></div>
+    </div>
   </div>
 
 <script>
@@ -348,6 +354,9 @@ async function loadSessions(){
     const data = await r.json();
     allSessions = data.sessions || [];
     
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('contentArea').style.display = 'block';
+    
     if (!allSessions.length) {
       document.getElementById('stats').innerHTML = '<div class="muted">No sessions yet.</div>';
       document.getElementById('sessionsList').innerText = 'No sessions yet.';
@@ -357,7 +366,7 @@ async function loadSessions(){
     populateUserFilter();
     applyFilter();
   } catch(e) {
-    document.getElementById('sessionsList').innerText = 'Failed to load sessions.';
+    document.getElementById('loadingState').innerHTML = '❌ Failed to load sessions.';
   }
 }
 
