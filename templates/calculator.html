@@ -49,11 +49,10 @@
     <div class="muted" style="margin-top:6px;">Time the car pauses for cell balancing</div>
   </div>
 
-  <button class="btn-primary" onclick="calculate()">Calculate</button>
-
   <div class="result" id="result">
     <div class="result-value" id="resultValue">-</div>
     <div class="result-label" id="resultLabel">Recommended Amps</div>
+    <button class="btn-primary" id="setAmpsBtn" onclick="setAmps()" style="margin-top:12px; display:none;">Set Amps</button>
   </div>
 
   <div class="card" id="detailsCard" style="display:none;">
@@ -80,6 +79,7 @@
 
 <script>
 let batteryCapacity = 64; // Default, loaded from settings
+let calculatedAmps = 0;
 
 async function loadSettings() {
   try {
@@ -134,17 +134,27 @@ function calculate() {
   // Show result
   resultEl.style.display = 'block';
   resultEl.className = 'result';
+  const setAmpsBtn = document.getElementById('setAmpsBtn');
   
   if (requiredAmps > 16) {
     resultEl.className = 'result error';
     resultValue.innerText = requiredAmps.toFixed(1) + ' A';
     resultLabel.innerText = '⚠️ Exceeds max 16A - need more time!';
+    calculatedAmps = 16;
+    setAmpsBtn.style.display = 'block';
+    setAmpsBtn.innerText = 'Set Max (16 A)';
   } else if (requiredAmps < 6) {
+    calculatedAmps = 6;
     resultValue.innerText = '6 A';
     resultLabel.innerText = 'Minimum 6A (will finish early)';
+    setAmpsBtn.style.display = 'block';
+    setAmpsBtn.innerText = 'Set 6 A';
   } else {
-    resultValue.innerText = Math.ceil(requiredAmps) + ' A';
+    calculatedAmps = Math.ceil(requiredAmps);
+    resultValue.innerText = calculatedAmps + ' A';
     resultLabel.innerText = 'Recommended Setting';
+    setAmpsBtn.style.display = 'block';
+    setAmpsBtn.innerText = 'Set ' + calculatedAmps + ' A';
   }
 
   // Show details
@@ -153,6 +163,33 @@ function calculate() {
   document.getElementById('detailEnergy').innerText = energyNeeded.toFixed(1) + ' kWh';
   document.getElementById('detailTime').innerText = actualChargingHours.toFixed(1) + ' hours';
   document.getElementById('detailPower').innerText = requiredPowerKw.toFixed(2) + ' kW';
+}
+
+async function setAmps() {
+  if (calculatedAmps < 6 || calculatedAmps > 16) return;
+  
+  const btn = document.getElementById('setAmpsBtn');
+  btn.disabled = true;
+  btn.innerText = 'Setting...';
+  
+  try {
+    const r = await fetch('/api/amps/' + calculatedAmps, { method: 'POST' });
+    if (r.ok) {
+      btn.innerText = '✓ Set to ' + calculatedAmps + ' A';
+      btn.style.background = '#1db954';
+      setTimeout(() => {
+        btn.innerText = 'Set ' + calculatedAmps + ' A';
+        btn.style.background = '';
+        btn.disabled = false;
+      }, 2000);
+    } else {
+      btn.innerText = '✗ Failed';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    btn.innerText = '✗ Error';
+    btn.disabled = false;
+  }
 }
 
 // Auto-calculate on input change
