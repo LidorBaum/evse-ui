@@ -510,11 +510,14 @@ async function load(){
 
   // Error detection
   const errorDetails = ch.error_details;
-  if (errorDetails && errorDetails !== 'No Errors' && errorDetails !== '-' && errorDetails !== lastErrorDetails) {
+  const isNoError = !errorDetails || errorDetails === '-' || 
+    errorDetails.toLowerCase().includes('no error');
+  
+  if (!isNoError && errorDetails !== lastErrorDetails) {
     showErrorAlert('⚠️ ' + errorDetails);
     showNotification('Charger Error! ⚠️', errorDetails);
     lastErrorDetails = errorDetails;
-  } else if (!errorDetails || errorDetails === 'No Errors') {
+  } else if (isNoError) {
     hideErrorAlert();
     lastErrorDetails = null;
     errorDismissed = false;
