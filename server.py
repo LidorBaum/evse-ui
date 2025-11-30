@@ -8,6 +8,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import Cookie, FastAPI, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from paho.mqtt import client as mqtt
