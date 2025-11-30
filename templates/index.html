@@ -41,7 +41,7 @@
   </div>
   <div class="card">
     <div class="big">Max Amps: <span id="ampsVal">-</span>A</div>
-    <input id="amps" type="range" min="6" max="16" step="1"
+    <input id="amps" type="range" min="6" max="16" step="1" disabled style="opacity:0.5;"
        oninput="ampsVal.innerText=this.value"
        onchange="setAmps()" />
   </div>
@@ -349,6 +349,10 @@ async function load(){
 
   if (wasCharging !== isCharging || hadData !== hasData) {
     renderControlButtons();
+    // Enable/disable slider based on data availability
+    const ampsSlider = document.getElementById('amps');
+    ampsSlider.disabled = !hasData;
+    ampsSlider.style.opacity = hasData ? '1' : '0.5';
   }
 
   document.getElementById('statusText').innerHTML =
