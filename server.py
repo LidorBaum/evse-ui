@@ -351,6 +351,32 @@ def api_sessions():
         return {"sessions": list(reversed(items))}
 
 
+@app.post("/api/session/{session_id}/note")
+def api_session_note(session_id: str, body: dict):
+    """Add or update a note on a session."""
+    note = body.get("note", "").strip()
+    
+    with _sessions_lock:
+        # Check current session first
+        if current_session is not None and current_session.get("id") == session_id:
+            if "meta" not in current_session:
+                current_session["meta"] = {}
+            current_session["meta"]["note"] = note
+            _save_sessions()
+            return {"ok": True}
+        
+        # Check completed sessions
+        for s in sessions:
+            if s.get("id") == session_id:
+                if "meta" not in s:
+                    s["meta"] = {}
+                s["meta"]["note"] = note
+                _save_sessions()
+                return {"ok": True}
+    
+    return {"ok": False, "error": "Session not found"}
+
+
 @app.get("/api/settings")
 def api_get_settings():
     return app_settings

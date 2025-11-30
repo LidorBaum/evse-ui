@@ -5,18 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Charging Calculator - MG4 Charger</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
   <style>
-    body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
   <!-- Header -->
-  <header class="bg-white shadow-sm sticky top-0 z-10">
+  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-      <h1 class="text-xl font-semibold text-gray-900">🔌 Charging Calculator</h1>
-      <button onclick="location.href='/'" class="text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 rounded-lg transition">← Back</button>
+      <h1 class="text-xl font-semibold text-gray-900 dark:text-white">🔌 Charging Calculator</h1>
+      <button onclick="location.href='/'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">← Back</button>
     </div>
   </header>
 
@@ -26,42 +27,42 @@
       <!-- Input Column -->
       <div class="space-y-4">
         <!-- Current Battery -->
-        <div class="bg-white rounded-xl p-5 shadow-sm">
-          <label class="block text-sm font-medium text-gray-600 mb-2">Current Battery %</label>
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
+          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Current Battery %</label>
           <input type="number" id="currentPercent" min="0" max="100" value="20" inputmode="numeric" 
-            class="w-full rounded-lg border border-gray-300 py-3 px-4 text-lg text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
         </div>
 
         <!-- Target Battery -->
-        <div class="bg-white rounded-xl p-5 shadow-sm">
-          <label class="block text-sm font-medium text-gray-600 mb-2">Target Battery %</label>
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
+          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Target Battery %</label>
           <input type="number" id="targetPercent" min="0" max="100" value="80" inputmode="numeric"
-            class="w-full rounded-lg border border-gray-300 py-3 px-4 text-lg text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
         </div>
 
         <!-- Time Available -->
-        <div class="bg-white rounded-xl p-5 shadow-sm">
-          <label class="block text-sm font-medium text-gray-600 mb-2">Time Available (hours)</label>
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
+          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Time Available (hours)</label>
           <input type="number" id="availableHours" min="0" step="0.5" value="8" inputmode="decimal"
-            class="w-full rounded-lg border border-gray-300 py-3 px-4 text-lg text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
         </div>
 
         <!-- Balancing Time -->
-        <div class="bg-white rounded-xl p-5 shadow-sm">
-          <label class="block text-sm font-medium text-gray-600 mb-2">Balancing Time (minutes)</label>
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
+          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Balancing Time (minutes)</label>
           <input type="number" id="balancingMinutes" min="0" value="0" inputmode="numeric"
-            class="w-full rounded-lg border border-gray-300 py-3 px-4 text-lg text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
-          <p class="text-xs text-gray-500 mt-2">Extra time when charging slows near full to equalize cell voltages</p>
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Extra time when charging slows near full to equalize cell voltages</p>
         </div>
       </div>
 
       <!-- Result Column -->
       <div class="space-y-4">
         <!-- Result Card -->
-        <div class="bg-white rounded-xl p-6 shadow-sm" id="resultCard">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm transition-colors" id="resultCard">
           <div class="text-center">
-            <div class="text-5xl font-bold text-emerald-600" id="resultValue">-</div>
-            <div class="text-sm text-gray-500 mt-2" id="resultLabel">Recommended Amps</div>
+            <div class="text-5xl font-bold text-emerald-600 dark:text-emerald-400" id="resultValue">-</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 mt-2" id="resultLabel">Recommended Amps</div>
             <button id="setAmpsBtn" onclick="setAmps()" style="display:none;"
               class="mt-4 w-full py-3 px-4 rounded-xl font-bold text-white bg-emerald-500 hover:bg-emerald-600 transition cursor-pointer">
               Set Amps
@@ -70,24 +71,24 @@
         </div>
 
         <!-- Details Card -->
-        <div class="bg-white rounded-xl p-5 shadow-sm" id="detailsCard" style="display:none;">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">📊 Details</h3>
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors" id="detailsCard" style="display:none;">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">📊 Details</h3>
           <div class="space-y-3">
             <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Battery Capacity</span>
-              <span class="font-semibold text-gray-900" id="detailCapacity">-</span>
+              <span class="text-gray-600 dark:text-gray-400">Battery Capacity</span>
+              <span class="font-semibold text-gray-900 dark:text-white" id="detailCapacity">-</span>
             </div>
             <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Energy Needed</span>
-              <span class="font-semibold text-gray-900" id="detailEnergy">-</span>
+              <span class="text-gray-600 dark:text-gray-400">Energy Needed</span>
+              <span class="font-semibold text-gray-900 dark:text-white" id="detailEnergy">-</span>
             </div>
             <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Actual Charging Time</span>
-              <span class="font-semibold text-gray-900" id="detailTime">-</span>
+              <span class="text-gray-600 dark:text-gray-400">Actual Charging Time</span>
+              <span class="font-semibold text-gray-900 dark:text-white" id="detailTime">-</span>
             </div>
             <div class="flex justify-between text-sm">
-              <span class="text-gray-600">Charging Rate</span>
-              <span class="font-semibold text-gray-900" id="detailPower">-</span>
+              <span class="text-gray-600 dark:text-gray-400">Charging Rate</span>
+              <span class="font-semibold text-gray-900 dark:text-white" id="detailPower">-</span>
             </div>
           </div>
         </div>
@@ -96,6 +97,13 @@
   </main>
 
 <script>
+// Dark mode init
+(function() {
+  const isDark = localStorage.getItem('darkMode') === 'true' || 
+    (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (isDark) document.documentElement.classList.add('dark');
+})();
+
 let batteryCapacity = 64;
 let calculatedAmps = 0;
 
@@ -122,7 +130,7 @@ function calculate() {
 
   // Validation
   if (targetPercent <= currentPercent) {
-    resultCard.className = 'bg-red-50 rounded-xl p-6 shadow-sm';
+    resultCard.className = 'bg-red-50 dark:bg-red-900/30 rounded-xl p-6 shadow-sm transition-colors';
     resultValue.className = 'text-5xl font-bold text-red-500';
     resultValue.innerText = '⚠️';
     resultLabel.innerText = 'Target must be higher than current %';
@@ -138,7 +146,7 @@ function calculate() {
   const actualChargingHours = safeAvailableHours - (balancingMinutes / 60);
 
   if (actualChargingHours <= 0) {
-    resultCard.className = 'bg-red-50 rounded-xl p-6 shadow-sm';
+    resultCard.className = 'bg-red-50 dark:bg-red-900/30 rounded-xl p-6 shadow-sm transition-colors';
     resultValue.className = 'text-5xl font-bold text-red-500';
     resultValue.innerText = '⚠️';
     resultLabel.innerText = 'Not enough time after balancing';
@@ -151,12 +159,12 @@ function calculate() {
   const requiredAmps = (energyNeeded * 16) / (10 * actualChargingHours);
 
   // Show result
-  resultCard.className = 'bg-white rounded-xl p-6 shadow-sm';
-  resultValue.className = 'text-5xl font-bold text-emerald-600';
+  resultCard.className = 'bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm transition-colors';
+  resultValue.className = 'text-5xl font-bold text-emerald-600 dark:text-emerald-400';
   
   if (requiredAmps > 16) {
-    resultCard.className = 'bg-amber-50 rounded-xl p-6 shadow-sm';
-    resultValue.className = 'text-5xl font-bold text-amber-600';
+    resultCard.className = 'bg-amber-50 dark:bg-amber-900/30 rounded-xl p-6 shadow-sm transition-colors';
+    resultValue.className = 'text-5xl font-bold text-amber-600 dark:text-amber-400';
     resultValue.innerText = requiredAmps.toFixed(1) + ' A';
     resultLabel.innerText = '⚠️ Exceeds max 16A - need more time!';
     calculatedAmps = 16;

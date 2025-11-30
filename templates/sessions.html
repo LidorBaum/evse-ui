@@ -1,33 +1,34 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"> q
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sessions - MG4 Charger</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
   <style>
-    body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
   <!-- Header -->
-  <header class="bg-white shadow-sm sticky top-0 z-10">
+  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-      <h1 class="text-xl font-semibold text-gray-900">📋 Sessions</h1>
+      <h1 class="text-xl font-semibold text-gray-900 dark:text-white">📋 Sessions</h1>
       <div class="flex items-center gap-3">
-        <select id="userFilter" onchange="applyFilter()" class="text-sm rounded-lg border border-gray-300 py-2 pl-3 pr-8 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500">
+        <select id="userFilter" onchange="applyFilter()" class="text-sm rounded-lg border border-gray-300 dark:border-gray-600 py-2 pl-3 pr-8 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500">
           <option value="">All Users</option>
         </select>
-        <button onclick="location.href='/'" class="text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 rounded-lg transition">← Back</button>
+        <button onclick="location.href='/'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">← Back</button>
       </div>
     </div>
   </header>
 
   <!-- Loading State -->
   <div id="loadingState" class="flex items-center justify-center py-20">
-    <div class="text-center text-gray-500">
+    <div class="text-center text-gray-500 dark:text-gray-400">
       <div class="text-3xl mb-2">⏳</div>
       <div>Loading sessions...</div>
     </div>
@@ -36,28 +37,35 @@
   <!-- Main Content -->
   <main id="contentArea" class="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto" style="display:none;">
     <!-- Summary Stats -->
-    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">📊 Summary</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">📊 Summary</h2>
       <div id="stats"></div>
     </div>
 
     <!-- Monthly Breakdown -->
-    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
       <div class="flex justify-between items-center">
-        <h2 class="text-lg font-semibold text-gray-900">📅 Monthly Breakdown</h2>
-        <button onclick="toggleMonths()" id="monthsToggle" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">Show</button>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">📅 Monthly Breakdown</h2>
+        <button onclick="toggleMonths()" id="monthsToggle" class="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium">Show</button>
       </div>
       <div id="monthlyBreakdown" style="display:none;" class="mt-4"></div>
     </div>
 
     <!-- All Sessions -->
-    <div class="bg-white rounded-xl p-5 shadow-sm">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">🔋 All Sessions</h2>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">🔋 All Sessions</h2>
       <div id="sessionsList"></div>
     </div>
   </main>
 
 <script>
+// Dark mode init
+(function() {
+  const isDark = localStorage.getItem('darkMode') === 'true' || 
+    (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (isDark) document.documentElement.classList.add('dark');
+})();
+
 let pricePerKwh = 0;
 let clockSettings = { clock_start: '23:00', clock_end: '07:00' };
 const CLOCK_DISCOUNT = 0.8;
@@ -222,33 +230,33 @@ function renderStats(sessions) {
 
   document.getElementById('stats').innerHTML = `
     <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-      <div class="text-center p-4 bg-emerald-50 rounded-xl">
-        <div class="text-2xl font-bold text-emerald-600">₪${monthCost.toFixed(0)}</div>
-        <div class="text-xs text-gray-500 mt-1">This Month</div>
+      <div class="text-center p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl">
+        <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₪${monthCost.toFixed(0)}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">This Month</div>
       </div>
-      <div class="text-center p-4 bg-emerald-50 rounded-xl">
-        <div class="text-2xl font-bold text-emerald-600">₪${totalCost.toFixed(0)}</div>
-        <div class="text-xs text-gray-500 mt-1">All Time</div>
+      <div class="text-center p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl">
+        <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₪${totalCost.toFixed(0)}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">All Time</div>
       </div>
-      <div class="text-center p-4 bg-gray-100 rounded-xl">
-        <div class="text-2xl font-bold text-gray-700">${monthKwh.toFixed(0)}</div>
-        <div class="text-xs text-gray-500 mt-1">kWh This Month</div>
+      <div class="text-center p-4 bg-gray-100 dark:bg-gray-700 rounded-xl">
+        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${monthKwh.toFixed(0)}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">kWh This Month</div>
       </div>
-      <div class="text-center p-4 bg-gray-100 rounded-xl">
-        <div class="text-2xl font-bold text-gray-700">${totalKwh.toFixed(0)}</div>
-        <div class="text-xs text-gray-500 mt-1">kWh All Time</div>
+      <div class="text-center p-4 bg-gray-100 dark:bg-gray-700 rounded-xl">
+        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${totalKwh.toFixed(0)}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">kWh All Time</div>
       </div>
-      <div class="text-center p-4 bg-gray-100 rounded-xl">
-        <div class="text-2xl font-bold text-gray-700">${sessions.length}</div>
-        <div class="text-xs text-gray-500 mt-1">Total Sessions</div>
+      <div class="text-center p-4 bg-gray-100 dark:bg-gray-700 rounded-xl">
+        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${sessions.length}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Total Sessions</div>
       </div>
-      <div class="text-center p-4 bg-gray-100 rounded-xl">
-        <div class="text-2xl font-bold text-gray-700">${monthSessions}</div>
-        <div class="text-xs text-gray-500 mt-1">Sessions This Month</div>
+      <div class="text-center p-4 bg-gray-100 dark:bg-gray-700 rounded-xl">
+        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${monthSessions}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Sessions This Month</div>
       </div>
     </div>
-    <div class="text-center p-3 bg-amber-50 rounded-xl">
-      🏆 <span class="font-semibold">Biggest charge:</span> ${biggestSession.toFixed(1)} kWh by ${biggestSessionUser}
+    <div class="text-center p-3 bg-amber-50 dark:bg-amber-900/30 rounded-xl">
+      🏆 <span class="font-semibold text-gray-900 dark:text-white">Biggest charge:</span> <span class="text-gray-700 dark:text-gray-300">${biggestSession.toFixed(1)} kWh by ${biggestSessionUser}</span>
     </div>
   `;
 }
@@ -276,20 +284,20 @@ function renderMonthlyBreakdown(sessions) {
 
   const html = sortedMonths.map(key => {
     const m = months[key];
-    return `<div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+    return `<div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
       <div>
-        <span class="font-semibold text-gray-900">${getMonthName(key)}</span>
-        <span class="text-sm text-gray-500 ml-2">(${m.count} sessions)</span>
+        <span class="font-semibold text-gray-900 dark:text-white">${getMonthName(key)}</span>
+        <span class="text-sm text-gray-500 dark:text-gray-400 ml-2">(${m.count} sessions)</span>
       </div>
       <div class="text-right">
-        <span class="font-semibold text-gray-900">${m.kwh.toFixed(0)} kWh</span>
-        <span class="text-gray-500 mx-1">·</span>
-        <span class="font-semibold text-emerald-600">₪${m.cost.toFixed(0)}</span>
+        <span class="font-semibold text-gray-900 dark:text-white">${m.kwh.toFixed(0)} kWh</span>
+        <span class="text-gray-500 dark:text-gray-400 mx-1">·</span>
+        <span class="font-semibold text-emerald-600 dark:text-emerald-400">₪${m.cost.toFixed(0)}</span>
       </div>
     </div>`;
   }).join('');
 
-  document.getElementById('monthlyBreakdown').innerHTML = html || '<div class="text-gray-500">No data</div>';
+  document.getElementById('monthlyBreakdown').innerHTML = html || '<div class="text-gray-500 dark:text-gray-400">No data</div>';
 }
 
 function toggleMonths() {
@@ -314,17 +322,19 @@ function fmtSession(s){
   const cost = '₪' + calcSessionCost(energyVal, s.started_at, s.ended_at).toFixed(2);
 
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
+  const note = (s.meta && s.meta.note) ? s.meta.note : '';
 
-  return `<div class="py-3 border-b border-gray-100 last:border-0">
+  return `<div class="py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
     <div class="flex items-center gap-2 flex-wrap">
-      <span class="font-bold text-gray-900">${energy}</span>
-      <span class="text-gray-400">·</span>
-      <span class="text-gray-600">${cost}</span>
-      <span class="text-gray-400">·</span>
-      <span class="text-gray-600">${user}</span>
+      <span class="font-bold text-gray-900 dark:text-white">${energy}</span>
+      <span class="text-gray-400 dark:text-gray-500">·</span>
+      <span class="text-gray-600 dark:text-gray-400">${cost}</span>
+      <span class="text-gray-400 dark:text-gray-500">·</span>
+      <span class="text-gray-600 dark:text-gray-400">${user}</span>
       ${ongoing ? '<span class="text-emerald-500 font-medium">🔌 Charging</span>' : ''}
     </div>
-    <div class="text-xs text-gray-400 mt-1">${start} → ${end}</div>
+    ${note ? `<div class="text-xs text-amber-600 dark:text-amber-400 mt-1 italic">"${note}"</div>` : ''}
+    <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">${start} → ${end}</div>
   </div>`;
 }
 
@@ -365,15 +375,15 @@ function applyFilter() {
   selectedUser = document.getElementById('userFilter').value;
   const filtered = getFilteredSessions();
   
-  document.getElementById('stats').innerHTML = '<div class="text-center py-4 text-gray-500">⏳</div>';
-  document.getElementById('sessionsList').innerHTML = '<div class="text-center py-4 text-gray-500">⏳</div>';
+  document.getElementById('stats').innerHTML = '<div class="text-center py-4 text-gray-500 dark:text-gray-400">⏳</div>';
+  document.getElementById('sessionsList').innerHTML = '<div class="text-center py-4 text-gray-500 dark:text-gray-400">⏳</div>';
   
   setTimeout(() => {
     renderStats(filtered);
     renderMonthlyBreakdown(filtered);
     
     if (!filtered.length) {
-      document.getElementById('sessionsList').innerHTML = '<div class="text-gray-500">No sessions for this user.</div>';
+      document.getElementById('sessionsList').innerHTML = '<div class="text-gray-500 dark:text-gray-400">No sessions for this user.</div>';
     } else {
       document.getElementById('sessionsList').innerHTML = filtered.map(fmtSession).join('');
     }
@@ -391,8 +401,8 @@ async function loadSessions(){
     document.getElementById('contentArea').style.display = 'block';
     
     if (!allSessions.length) {
-      document.getElementById('stats').innerHTML = '<div class="text-gray-500">No sessions yet.</div>';
-      document.getElementById('sessionsList').innerHTML = '<div class="text-gray-500">No sessions yet.</div>';
+      document.getElementById('stats').innerHTML = '<div class="text-gray-500 dark:text-gray-400">No sessions yet.</div>';
+      document.getElementById('sessionsList').innerHTML = '<div class="text-gray-500 dark:text-gray-400">No sessions yet.</div>';
       return;
     }
 

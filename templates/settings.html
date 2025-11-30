@@ -5,66 +5,67 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings - MG4 Charger</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
   <style>
-    body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
   <!-- Header -->
-  <header class="bg-white shadow-sm sticky top-0 z-10">
+  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-      <h1 class="text-xl font-semibold text-gray-900">⚙️ Settings</h1>
-      <button onclick="location.href='/'" class="text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 rounded-lg transition">← Back</button>
+      <h1 class="text-xl font-semibold text-gray-900 dark:text-white">⚙️ Settings</h1>
+      <button onclick="location.href='/'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">← Back</button>
     </div>
   </header>
 
   <!-- Main Content -->
   <main class="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
     <!-- Clock Hours -->
-    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">Clock Hours</h2>
-      <p class="text-sm text-gray-500 mt-1">Charging schedule window (used by charger timer feature)</p>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Clock Hours</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Charging schedule window (used by charger timer feature)</p>
       <div class="grid grid-cols-2 gap-4 mt-4">
         <div>
-          <label class="block text-sm font-medium text-gray-600 mb-1">Start</label>
-          <input type="time" id="clockStart" class="w-full rounded-lg border border-gray-300 py-2.5 px-3 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Start</label>
+          <input type="time" id="clockStart" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-600 mb-1">End</label>
-          <input type="time" id="clockEnd" class="w-full rounded-lg border border-gray-300 py-2.5 px-3 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">End</label>
+          <input type="time" id="clockEnd" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
         </div>
       </div>
     </div>
 
     <!-- Users -->
-    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">Users</h2>
-      <p class="text-sm text-gray-500 mt-1">Comma-separated list of user names for the dropdown</p>
-      <input type="text" id="usersList" placeholder="Lidor, Bar" class="mt-3 w-full rounded-lg border border-gray-300 py-2.5 px-3 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Users</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Comma-separated list of user names for the dropdown</p>
+      <input type="text" id="usersList" placeholder="Lidor, Bar" class="mt-3 w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
     </div>
 
     <!-- Price per kWh -->
-    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">Price per kWh</h2>
-      <p class="text-sm text-gray-500 mt-1">Electricity rate for cost estimation (₪)</p>
-      <input type="number" id="pricePerKwh" step="0.01" min="0" class="mt-3 w-full rounded-lg border border-gray-300 py-2.5 px-3 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Price per kWh</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Electricity rate for cost estimation (₪)</p>
+      <input type="number" id="pricePerKwh" step="0.01" min="0" class="mt-3 w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
     </div>
 
     <!-- Battery Capacity -->
-    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">Battery Capacity</h2>
-      <p class="text-sm text-gray-500 mt-1">Car battery size in kWh (for charging calculator)</p>
-      <input type="number" id="batteryCapacity" step="0.1" min="0" placeholder="64" class="mt-3 w-full rounded-lg border border-gray-300 py-2.5 px-3 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500" />
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Battery Capacity</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Car battery size in kWh (for charging calculator)</p>
+      <input type="number" id="batteryCapacity" step="0.1" min="0" placeholder="64" class="mt-3 w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
     </div>
 
     <!-- Bluetooth Control -->
-    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
-      <h2 class="text-lg font-semibold text-gray-900">Bluetooth Control</h2>
-      <p class="text-sm text-gray-500 mt-1">Pause BLE bridge to connect with phone app</p>
-      <button onclick="pauseBle(60)" class="mt-3 w-full py-3 px-4 rounded-xl font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition cursor-pointer">Pause 60s</button>
-      <p class="text-sm text-emerald-600 mt-2" id="pauseNote"></p>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Bluetooth Control</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Pause BLE bridge to connect with phone app</p>
+      <button onclick="pauseBle(60)" class="mt-3 w-full py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer">Pause 60s</button>
+      <p class="text-sm text-emerald-600 dark:text-emerald-400 mt-2" id="pauseNote"></p>
     </div>
 
     <!-- Save Button -->
@@ -73,6 +74,13 @@
   </main>
 
 <script>
+// Dark mode init
+(function() {
+  const isDark = localStorage.getItem('darkMode') === 'true' || 
+    (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (isDark) document.documentElement.classList.add('dark');
+})();
+
 async function loadSettings(){
   try {
     const r = await fetch('/api/settings');

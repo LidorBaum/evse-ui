@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MG4 Charger Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
   <style>
     :root {
       --primary-green: #10B981;
@@ -15,14 +20,28 @@
     }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-200">
+  <!-- Error Alert Banner (hidden by default) -->
+  <div id="errorAlert" class="hidden fixed top-0 left-0 right-0 z-50 bg-red-500 text-white px-4 py-3 shadow-lg">
+    <div class="max-w-5xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">⚠️</span>
+        <span id="errorAlertText" class="font-medium">Charger Error Detected</span>
+      </div>
+      <button onclick="dismissErrorAlert()" class="text-white hover:text-red-100 text-xl">&times;</button>
+    </div>
+  </div>
+
   <!-- Header -->
-  <header class="bg-white shadow-sm sticky top-0 z-10">
+  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-      <h1 class="text-xl font-semibold text-gray-900">MG4 Charger</h1>
-      <div class="flex space-x-2">
-        <button onclick="location.href='/calculator'" class="text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 rounded-lg transition">Calculator</button>
-        <button onclick="location.href='/settings'" class="text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-3 py-2 rounded-lg transition">Settings</button>
+      <h1 class="text-xl font-semibold text-gray-900 dark:text-white">MG4 Charger</h1>
+      <div class="flex items-center space-x-2">
+        <button onclick="toggleDarkMode()" id="darkModeBtn" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition" title="Toggle dark mode">
+          <span id="darkModeIcon">🌙</span>
+        </button>
+        <button onclick="location.href='/calculator'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">Calculator</button>
+        <button onclick="location.href='/settings'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">Settings</button>
       </div>
     </div>
   </header>
@@ -30,26 +49,26 @@
   <!-- Main Content -->
   <main class="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
     <!-- User Section -->
-    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
-      <h2 class="text-lg font-semibold text-gray-900 mb-2">User</h2>
-      <select id="userSelect" class="block w-full max-w-xs rounded-lg border border-gray-300 py-2.5 pl-3 pr-10 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">User</h2>
+      <select id="userSelect" class="block w-full max-w-xs rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 pl-3 pr-10 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm">
       </select>
-      <p class="mt-2 text-sm text-gray-500">Selected user will be attached to new sessions.</p>
+      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Selected user will be attached to new sessions.</p>
     </div>
 
     <!-- Controls Section -->
-    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
       <div class="flex gap-3" id="controlButtons">
         <!-- Buttons rendered by JS based on clock hours -->
       </div>
-      <p class="mt-2 text-sm text-gray-500" id="clockModeNote"></p>
+      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400" id="clockModeNote"></p>
     </div>
 
     <!-- Amps Slider -->
-    <div class="bg-white rounded-xl p-5 shadow-sm mb-4">
-      <div class="text-lg font-semibold text-gray-900 mb-3">Max Amps: <span id="ampsVal">-</span>A</div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
+      <div class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Max Amps: <span id="ampsVal">-</span>A</div>
       <input id="amps" type="range" min="6" max="16" step="1" disabled
-         class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed accent-emerald-500"
+         class="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed accent-emerald-500"
          oninput="ampsVal.innerText=this.value"
          onchange="setAmps()" />
     </div>
@@ -57,31 +76,45 @@
     <!-- Status and Telemetry Grid -->
     <div class="grid md:grid-cols-2 gap-4 mb-4">
       <!-- Status Card -->
-      <div class="bg-white rounded-xl p-5 shadow-sm">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
         <div class="flex justify-between items-start mb-3">
-          <h2 class="text-lg font-semibold text-gray-900">Status</h2>
-          <span id="availability" class="text-sm font-medium text-gray-600">...</span>
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Status</h2>
+          <span id="availability" class="text-sm font-medium text-gray-600 dark:text-gray-400">...</span>
         </div>
-        <p class="text-xs text-gray-500 italic mb-3" id="lastUpdate">Last update: -</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 italic mb-3" id="lastUpdate">Last update: -</p>
         <div id="statusText" class="space-y-1"></div>
       </div>
 
       <!-- Telemetry Card -->
-      <div class="bg-white rounded-xl p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-gray-900 mb-3">Telemetry</h2>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Telemetry</h2>
         <div id="telemetry" class="space-y-1"></div>
       </div>
     </div>
 
     <!-- History Section -->
-    <div class="bg-white rounded-xl p-5 shadow-sm">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-semibold text-gray-900">History</h2>
-        <button onclick="location.href='/sessions'" class="text-sm text-emerald-600 hover:text-emerald-700 font-medium">View All →</button>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">History</h2>
+        <button onclick="location.href='/sessions'" class="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium">View All →</button>
       </div>
-      <div id="history" class="text-sm text-gray-500">No sessions yet.</div>
+      <div id="history" class="text-sm text-gray-500 dark:text-gray-400">No sessions yet.</div>
     </div>
   </main>
+
+  <!-- Session Note Modal -->
+  <div id="noteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4 shadow-xl">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Note to Session</h3>
+      <input type="hidden" id="noteSessionId" />
+      <textarea id="noteText" rows="3" placeholder="e.g., Road trip prep, Weekly top-up..." 
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm"></textarea>
+      <div class="flex gap-3 mt-4">
+        <button onclick="closeNoteModal()" class="flex-1 py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
+        <button onclick="saveNote()" class="flex-1 py-2 px-4 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">Save</button>
+      </div>
+    </div>
+  </div>
 
 <script>
 let isDragging = false;
@@ -94,6 +127,77 @@ let lockUntilTs = 0;
 let clockSettings = { clock_start: '07:00', clock_end: '23:00' };
 let isCharging = false;
 let hasData = false;
+let lastErrorDetails = null;
+let errorDismissed = false;
+let notificationsEnabled = false;
+
+// Dark mode
+function initDarkMode() {
+  const isDark = localStorage.getItem('darkMode') === 'true' || 
+    (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (isDark) {
+    document.documentElement.classList.add('dark');
+    document.getElementById('darkModeIcon').innerText = '☀️';
+  }
+}
+
+function toggleDarkMode() {
+  const isDark = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('darkMode', isDark);
+  document.getElementById('darkModeIcon').innerText = isDark ? '☀️' : '🌙';
+}
+
+initDarkMode();
+
+// Notifications
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') {
+    notificationsEnabled = true;
+    return true;
+  }
+  if (Notification.permission !== 'denied') {
+    const permission = await Notification.requestPermission();
+    notificationsEnabled = permission === 'granted';
+    return notificationsEnabled;
+  }
+  return false;
+}
+
+function showNotification(title, body, icon = '🔌') {
+  if (!notificationsEnabled) return;
+  try {
+    new Notification(title, { body, icon: '/favicon.ico', badge: '/favicon.ico' });
+  } catch(e) {
+    // Fallback for mobile
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'notification', title, body });
+    }
+  }
+}
+
+// Request permission on first interaction
+document.body.addEventListener('click', () => {
+  if (!notificationsEnabled) requestNotificationPermission();
+}, { once: true });
+
+// Error Alert
+function showErrorAlert(message) {
+  if (errorDismissed && message === lastErrorDetails) return;
+  const alert = document.getElementById('errorAlert');
+  document.getElementById('errorAlertText').innerText = message;
+  alert.classList.remove('hidden');
+  errorDismissed = false;
+}
+
+function hideErrorAlert() {
+  document.getElementById('errorAlert').classList.add('hidden');
+}
+
+function dismissErrorAlert() {
+  errorDismissed = true;
+  hideErrorAlert();
+}
 
 function currentUser(){
   const sel = document.getElementById('userSelect');
@@ -124,8 +228,8 @@ function renderControlButtons(){
 
   if (!hasData) {
     container.innerHTML = `
-      <button class="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-gray-300 cursor-not-allowed" disabled>Start</button>
-      <button class="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-gray-300 cursor-not-allowed" disabled>Stop</button>
+      <button class="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-gray-300 dark:bg-gray-600 cursor-not-allowed" disabled>Start</button>
+      <button class="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-gray-300 dark:bg-gray-600 cursor-not-allowed" disabled>Stop</button>
     `;
     note.innerText = '⏳ Waiting for charger data...';
     return;
@@ -169,9 +273,9 @@ async function setAmps(){
 }
 
 function kv(k, v, highlight = false){
-  const valueClass = highlight ? 'font-bold text-emerald-600' : 'font-semibold text-gray-900';
+  const valueClass = highlight ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'font-semibold text-gray-900 dark:text-white';
   return `<div class="flex justify-between text-sm">
-    <span class="text-gray-600">${k}</span>
+    <span class="text-gray-600 dark:text-gray-400">${k}</span>
     <span class="${valueClass}">${v}</span>
   </div>`;
 }
@@ -194,7 +298,7 @@ function fmtDate(isoStr){
 }
 
 let pricePerKwh = 0;
-let batteryCapacity = 64; // kWh, loaded from settings
+let batteryCapacity = 64;
 const CLOCK_DISCOUNT = 0.8;
 
 function isMinuteInClock(minute) {
@@ -266,19 +370,56 @@ function fmtSession(s){
   const cost = '₪' + calcSessionCost(energyVal, s.started_at, s.ended_at).toFixed(2);
 
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
+  const note = (s.meta && s.meta.note) ? s.meta.note : '';
 
-  return `<div class="py-2 border-b border-gray-100 last:border-0">
+  return `<div class="py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
     <div class="flex items-center gap-2 flex-wrap">
-      <span class="font-bold text-gray-900">${energy}</span>
-      <span class="text-emerald-600 font-medium">(+${batteryPct}%)</span>
-      <span class="text-gray-500">·</span>
-      <span class="text-gray-600">${cost}</span>
-      <span class="text-gray-500">·</span>
-      <span class="text-gray-600">${user}</span>
+      <span class="font-bold text-gray-900 dark:text-white">${energy}</span>
+      <span class="text-emerald-600 dark:text-emerald-400 font-medium">(+${batteryPct}%)</span>
+      <span class="text-gray-500 dark:text-gray-500">·</span>
+      <span class="text-gray-600 dark:text-gray-400">${cost}</span>
+      <span class="text-gray-500 dark:text-gray-500">·</span>
+      <span class="text-gray-600 dark:text-gray-400">${user}</span>
       ${ongoing ? '<span class="text-emerald-500">🔌</span>' : ''}
+      <button onclick="openNoteModal('${s.id}')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs ml-auto" title="${note || 'Add note'}">
+        ${note ? '📝' : '➕'}
+      </button>
     </div>
-    <div class="text-xs text-gray-400 mt-0.5">${start} → ${end}</div>
+    ${note ? `<div class="text-xs text-amber-600 dark:text-amber-400 mt-1 italic">"${note}"</div>` : ''}
+    <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">${start} → ${end}</div>
   </div>`;
+}
+
+// Note Modal
+let sessionNotes = {};
+
+function openNoteModal(sessionId) {
+  document.getElementById('noteSessionId').value = sessionId;
+  document.getElementById('noteText').value = sessionNotes[sessionId] || '';
+  document.getElementById('noteModal').classList.remove('hidden');
+  document.getElementById('noteText').focus();
+}
+
+function closeNoteModal() {
+  document.getElementById('noteModal').classList.add('hidden');
+}
+
+async function saveNote() {
+  const sessionId = document.getElementById('noteSessionId').value;
+  const note = document.getElementById('noteText').value.trim();
+  
+  try {
+    const r = await fetch('/api/session/' + sessionId + '/note', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ note })
+    });
+    if (r.ok) {
+      sessionNotes[sessionId] = note;
+      closeNoteModal();
+      loadSessions();
+    }
+  } catch(e) {}
 }
 
 async function loadSessions(){
@@ -292,6 +433,10 @@ async function loadSessions(){
       el.innerText = 'No sessions yet.';
       return;
     }
+    // Cache notes
+    list.forEach(s => {
+      if (s.meta && s.meta.note) sessionNotes[s.id] = s.meta.note;
+    });
     const recent = list.slice(0, 10);
     el.innerHTML = recent.map(fmtSession).join('');
   }catch(e){}
@@ -303,7 +448,7 @@ function updateLastUpdateDisplay(){
   const el = document.getElementById('lastUpdate');
   if (!lastUpdateTs) {
     el.innerText = 'Last update: -';
-    el.className = 'text-xs text-gray-500 italic mb-3';
+    el.className = 'text-xs text-gray-500 dark:text-gray-400 italic mb-3';
     return;
   }
   const agoSec = Math.round((Date.now() / 1000) - lastUpdateTs);
@@ -352,10 +497,27 @@ async function load(){
   isCharging = (ch.output_state === 'Charging');
   hasData = Object.keys(ch).length > 0;
 
+  // Charging complete notification
+  if (wasCharging && !isCharging && hadData) {
+    showNotification('Charging Complete! ⚡', 'Your car has finished charging.');
+  }
+
   if (wasCharging !== isCharging || hadData !== hasData) {
     renderControlButtons();
     const ampsSlider = document.getElementById('amps');
     ampsSlider.disabled = !hasData;
+  }
+
+  // Error detection
+  const errorDetails = ch.error_details;
+  if (errorDetails && errorDetails !== 'No Errors' && errorDetails !== '-' && errorDetails !== lastErrorDetails) {
+    showErrorAlert('⚠️ ' + errorDetails);
+    showNotification('Charger Error! ⚠️', errorDetails);
+    lastErrorDetails = errorDetails;
+  } else if (!errorDetails || errorDetails === 'No Errors') {
+    hideErrorAlert();
+    lastErrorDetails = null;
+    errorDismissed = false;
   }
 
   const statusHtml = [];
