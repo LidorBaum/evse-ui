@@ -34,9 +34,15 @@ def _load_settings() -> dict:
         "clock_start": "07:00",
         "clock_end": "23:00",
         "users": ["Lidor", "Bar"],
+        "price_per_kwh": 0.55,
     }
+    needs_save = False
+
     if not os.path.exists(SETTINGS_FILE):
+        # No file exists, use defaults and save them
+        _save_settings(defaults)
         return defaults
+
     try:
         with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -44,6 +50,10 @@ def _load_settings() -> dict:
         for k, v in defaults.items():
             if k not in data:
                 data[k] = v
+                needs_save = True
+        # Save back if we added missing keys
+        if needs_save:
+            _save_settings(data)
         return data
     except Exception:
         return defaults
@@ -266,6 +276,11 @@ def api_post_settings(new_settings: dict):
         app_settings["clock_end"] = new_settings["clock_end"]
     if "users" in new_settings and isinstance(new_settings["users"], list):
         app_settings["users"] = new_settings["users"]
+    if "price_per_kwh" in new_settings:
+        try:
+            app_settings["price_per_kwh"] = float(new_settings["price_per_kwh"])
+        except (TypeError, ValueError):
+            pass
     _save_settings(app_settings)
     return {"ok": True, "settings": app_settings}
 
@@ -507,26 +522,89 @@ function fmtDate(isoStr){
   }
 }
 
+let pricePerKwh = 0;  // loaded from settings
+const CLOCK_DISCOUNT = 0.8; // 20% off during clock hours
+
+// Check if a given minute-of-day is within clock hours
+function isMinuteInClock(minute) {
+  const [startH, startM] = clockSettings.clock_start.split(':').map(Number);
+  const [endH, endM] = clockSettings.clock_end.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  if (startMinutes <= endMinutes) {
+    return minute >= startMinutes && minute < endMinutes;
+  } else {
+    // Overnight range
+    return minute >= startMinutes || minute < endMinutes;
+  }
+}
+
+// Calculate minutes spent in clock vs non-clock for a session
+function calcClockMinutes(startedAt, endedAt) {
+  const startDate = new Date(startedAt);
+  const endDate = endedAt ? new Date(endedAt) : new Date();
+
+  let clockMins = 0;
+  let nonClockMins = 0;
+
+  // Iterate minute by minute (for accuracy across day boundaries)
+  const current = new Date(startDate);
+  while (current < endDate) {
+    // Get Jerusalem time for this minute
+    const jTime = new Date(current.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+    const minuteOfDay = jTime.getHours() * 60 + jTime.getMinutes();
+
+    if (isMinuteInClock(minuteOfDay)) {
+      clockMins++;
+    } else {
+      nonClockMins++;
+    }
+    current.setMinutes(current.getMinutes() + 1);
+  }
+
+  return { clockMins, nonClockMins };
+}
+
+function calcSessionCost(energyVal, startedAt, endedAt) {
+  if (energyVal <= 0) return 0;
+
+  const { clockMins, nonClockMins } = calcClockMinutes(startedAt, endedAt);
+  const totalMins = clockMins + nonClockMins;
+
+  if (totalMins === 0) return energyVal * pricePerKwh;
+
+  // Split energy proportionally by time
+  const clockEnergy = energyVal * (clockMins / totalMins);
+  const nonClockEnergy = energyVal * (nonClockMins / totalMins);
+
+  // Clock hours get 20% discount
+  const clockCost = clockEnergy * pricePerKwh * CLOCK_DISCOUNT;
+  const nonClockCost = nonClockEnergy * pricePerKwh;
+
+  return clockCost + nonClockCost;
+}
+
 function fmtSession(s){
   const start = fmtDate(s.started_at);
   const ongoing = !s.ended_at;
   const end = ongoing ? '⚡ ongoing' : fmtDate(s.ended_at);
 
-  // Compute energy: prefer session_energy_kwh, else delta, else live delta for ongoing
-  let energy;
+  // Compute energy: prefer session_energy_kwh, else delta
+  let energyVal = 0;
   if (s.session_energy_kwh != null) {
-    energy = s.session_energy_kwh.toFixed(1) + ' kWh';
+    energyVal = s.session_energy_kwh;
   } else if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
-    energy = (s.end_amount_kwh - s.start_amount_kwh).toFixed(1) + ' kWh';
-  } else {
-    energy = '0.0 kWh';
+    energyVal = s.end_amount_kwh - s.start_amount_kwh;
   }
+  const energy = energyVal.toFixed(1) + ' kWh';
+  const cost = '₪' + calcSessionCost(energyVal, s.started_at, s.ended_at).toFixed(2);
 
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
 
   return `<div class="kv" style="margin-bottom:8px;">
     <div style="flex:1;">
-      <div><b>${energy}</b> · ${user}${ongoing ? ' 🔌' : ''}</div>
+      <div><b>${energy}</b> · ${cost} · ${user}${ongoing ? ' 🔌' : ''}</div>
       <div style="font-size:12px;color:#888;">${start} → ${end}</div>
     </div>
   </div>`;
@@ -674,6 +752,9 @@ async function loadSettings(){
     clockSettings.clock_start = settings.clock_start || '07:00';
     clockSettings.clock_end = settings.clock_end || '23:00';
 
+    // Update price
+    pricePerKwh = settings.price_per_kwh;
+
     // Update users dropdown
     const users = settings.users || ['Lidor', 'Bar'];
     const sel = document.getElementById('userSelect');
@@ -747,6 +828,12 @@ def settings_page():
   </div>
 
   <div class="card">
+    <div class="big">Price per kWh</div>
+    <div class="muted">Electricity rate for cost estimation (₪)</div>
+    <input type="number" id="pricePerKwh" step="0.01" min="0" />
+  </div>
+
+  <div class="card">
     <div class="big">Bluetooth Control</div>
     <div class="muted">Pause BLE bridge to connect with phone app</div>
     <button onclick="pauseBle(60)" style="margin-top:12px; width:100%;">Pause 60s</button>
@@ -765,6 +852,7 @@ async function loadSettings(){
     document.getElementById('clockStart').value = s.clock_start || '06:00';
     document.getElementById('clockEnd').value = s.clock_end || '23:00';
     document.getElementById('usersList').value = (s.users || []).join(', ');
+    document.getElementById('pricePerKwh').value = s.price_per_kwh;
   } catch(e) {}
 }
 
@@ -783,6 +871,7 @@ async function saveSettings(){
   const clockEnd = document.getElementById('clockEnd').value;
   const usersRaw = document.getElementById('usersList').value;
   const users = usersRaw.split(',').map(u => u.trim()).filter(u => u.length > 0);
+  const pricePerKwh = parseFloat(document.getElementById('pricePerKwh').value) || 0;
 
   try {
     const r = await fetch('/api/settings', {
@@ -791,7 +880,8 @@ async function saveSettings(){
       body: JSON.stringify({
         clock_start: clockStart,
         clock_end: clockEnd,
-        users: users
+        users: users,
+        price_per_kwh: pricePerKwh
       })
     });
     if (r.ok) {
@@ -843,6 +933,10 @@ def sessions_page():
   </div>
 
 <script>
+let pricePerKwh = 0;  // loaded from settings
+let clockSettings = { clock_start: '23:00', clock_end: '07:00' };
+const CLOCK_DISCOUNT = 0.8;
+
 function fmtDate(isoStr){
   if (!isoStr) return '?';
   try {
@@ -860,26 +954,90 @@ function fmtDate(isoStr){
   }
 }
 
+function isMinuteInClock(minute) {
+  const [startH, startM] = clockSettings.clock_start.split(':').map(Number);
+  const [endH, endM] = clockSettings.clock_end.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  if (startMinutes <= endMinutes) {
+    return minute >= startMinutes && minute < endMinutes;
+  } else {
+    return minute >= startMinutes || minute < endMinutes;
+  }
+}
+
+function calcClockMinutes(startedAt, endedAt) {
+  const startDate = new Date(startedAt);
+  const endDate = endedAt ? new Date(endedAt) : new Date();
+
+  let clockMins = 0;
+  let nonClockMins = 0;
+
+  const current = new Date(startDate);
+  while (current < endDate) {
+    const jTime = new Date(current.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+    const minuteOfDay = jTime.getHours() * 60 + jTime.getMinutes();
+
+    if (isMinuteInClock(minuteOfDay)) {
+      clockMins++;
+    } else {
+      nonClockMins++;
+    }
+    current.setMinutes(current.getMinutes() + 1);
+  }
+
+  return { clockMins, nonClockMins };
+}
+
+function calcSessionCost(energyVal, startedAt, endedAt) {
+  if (energyVal <= 0) return 0;
+
+  const { clockMins, nonClockMins } = calcClockMinutes(startedAt, endedAt);
+  const totalMins = clockMins + nonClockMins;
+
+  if (totalMins === 0) return energyVal * pricePerKwh;
+
+  const clockEnergy = energyVal * (clockMins / totalMins);
+  const nonClockEnergy = energyVal * (nonClockMins / totalMins);
+
+  const clockCost = clockEnergy * pricePerKwh * CLOCK_DISCOUNT;
+  const nonClockCost = nonClockEnergy * pricePerKwh;
+
+  return clockCost + nonClockCost;
+}
+
 function fmtSession(s){
   const start = fmtDate(s.started_at);
   const ongoing = !s.ended_at;
   const end = ongoing ? '⚡ ongoing' : fmtDate(s.ended_at);
 
-  let energy;
+  let energyVal = 0;
   if (s.session_energy_kwh != null) {
-    energy = s.session_energy_kwh.toFixed(1) + ' kWh';
+    energyVal = s.session_energy_kwh;
   } else if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
-    energy = (s.end_amount_kwh - s.start_amount_kwh).toFixed(1) + ' kWh';
-  } else {
-    energy = '0.0 kWh';
+    energyVal = s.end_amount_kwh - s.start_amount_kwh;
   }
+  const energy = energyVal.toFixed(1) + ' kWh';
+  const cost = '₪' + calcSessionCost(energyVal, s.started_at, s.ended_at).toFixed(2);
 
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
 
   return `<div class="session">
-    <div><b>${energy}</b> · ${user}${ongoing ? ' 🔌' : ''}</div>
+    <div><b>${energy}</b> · ${cost} · ${user}${ongoing ? ' 🔌' : ''}</div>
     <div class="muted">${start} → ${end}</div>
   </div>`;
+}
+
+async function loadSettings(){
+  try {
+    const r = await fetch('/api/settings');
+    if (!r.ok) return;
+    const s = await r.json();
+    pricePerKwh = s.price_per_kwh;
+    clockSettings.clock_start = s.clock_start || '23:00';
+    clockSettings.clock_end = s.clock_end || '07:00';
+  } catch(e) {}
 }
 
 async function loadSessions(){
@@ -899,7 +1057,7 @@ async function loadSessions(){
   }
 }
 
-loadSessions();
+loadSettings().then(() => loadSessions());
 </script>
 
 </body>

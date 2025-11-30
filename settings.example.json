@@ -1,6 +1,7 @@
 {
-  "clock_start": "07:00",
-  "clock_end": "23:00",
-  "users": ["Lidor", "Bar"]
+  "clock_start": "23:00",
+  "clock_end": "07:00",
+  "users": ["Lidor", "Bar"],
+  "price_per_kwh": 0.55
 }
 
