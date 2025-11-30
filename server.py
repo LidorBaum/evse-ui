@@ -382,8 +382,11 @@ def ui():
   </div>
 
   <div class="card">
-    <div class="big">History (last 10 sessions)</div>
-    <div id="history" class="muted">No sessions yet.</div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="big">History</div>
+      <a href="/sessions" style="font-size:14px;">View All →</a>
+    </div>
+    <div id="history" class="muted" style="margin-top:8px;">No sessions yet.</div>
   </div>
 
 <script>
@@ -635,7 +638,7 @@ async function load(){
   t.push(kv("L3", fmtPhase(ch.l3_voltage, ch.l3_amperage)));
   t.push(kv("Charging Rate", ch.total_energy != null ? ch.total_energy + ' kW' : '-'));
   t.push(kv("Inner °C", ch.inner_temp_c ?? '-'));
-  t.push(kv("RSSI", rssiToWord(cfg.rssi)));
+  t.push(kv("Signal Strength", rssiToWord(cfg.rssi)));
   document.getElementById('telemetry').innerHTML = t.join('');
 }
 
@@ -804,6 +807,99 @@ async function saveSettings(){
 }
 
 loadSettings();
+</script>
+
+</body>
+</html>
+"""
+    return HTMLResponse(html)
+
+
+@app.get("/sessions")
+def sessions_page():
+    html = """
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BS20 Sessions</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 16px; }
+    .card { padding: 14px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 12px; }
+    .muted { color:#666; font-size:14px; }
+    .big { font-size:20px; font-weight:600; }
+    .session { padding: 12px 0; border-bottom: 1px solid #eee; }
+    .session:last-child { border-bottom: none; }
+  </style>
+</head>
+<body>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h2 style="margin:0;">📋 All Sessions</h2>
+    <a href="/" style="font-size:16px;">← Back</a>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    <div id="sessionsList" class="muted">Loading...</div>
+  </div>
+
+<script>
+function fmtDate(isoStr){
+  if (!isoStr) return '?';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleString('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch(e) {
+    return isoStr;
+  }
+}
+
+function fmtSession(s){
+  const start = fmtDate(s.started_at);
+  const ongoing = !s.ended_at;
+  const end = ongoing ? '⚡ ongoing' : fmtDate(s.ended_at);
+
+  let energy;
+  if (s.session_energy_kwh != null) {
+    energy = s.session_energy_kwh.toFixed(1) + ' kWh';
+  } else if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
+    energy = (s.end_amount_kwh - s.start_amount_kwh).toFixed(1) + ' kWh';
+  } else {
+    energy = '0.0 kWh';
+  }
+
+  const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
+
+  return `<div class="session">
+    <div><b>${energy}</b> · ${user}${ongoing ? ' 🔌' : ''}</div>
+    <div class="muted">${start} → ${end}</div>
+  </div>`;
+}
+
+async function loadSessions(){
+  try {
+    const r = await fetch('/api/sessions');
+    if (!r.ok) return;
+    const data = await r.json();
+    const list = data.sessions || [];
+    const el = document.getElementById('sessionsList');
+    if (!list.length) {
+      el.innerText = 'No sessions yet.';
+      return;
+    }
+    el.innerHTML = list.map(fmtSession).join('');
+  } catch(e) {
+    document.getElementById('sessionsList').innerText = 'Failed to load sessions.';
+  }
+}
+
+loadSessions();
 </script>
 
 </body>
