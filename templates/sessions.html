@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Sessions - MG4 Charger</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -22,7 +22,7 @@
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
   <!-- Header -->
-  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors">
+  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors pt-[env(safe-area-inset-top)]">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
       <h1 class="text-xl font-semibold text-gray-900 dark:text-white">📋 Sessions</h1>
       <div class="flex items-center gap-3">
@@ -37,7 +37,7 @@
   <!-- Loading State -->
   <div id="loadingState" class="flex items-center justify-center py-20">
     <div class="text-center text-gray-500 dark:text-gray-400">
-      <div class="text-3xl mb-2">⏳</div>
+      <svg class="w-8 h-8 mb-2 mx-auto animate-spin text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
       <div>Loading sessions...</div>
     </div>
   </div>
@@ -605,8 +605,8 @@ function applyFilter() {
   selectedUser = document.getElementById('userFilter').value;
   const filtered = getFilteredSessions();
   
-  document.getElementById('stats').innerHTML = '<div class="text-center py-4 text-gray-500 dark:text-gray-400">⏳</div>';
-  document.getElementById('sessionsList').innerHTML = '<div class="text-center py-4 text-gray-500 dark:text-gray-400">⏳</div>';
+  document.getElementById('stats').innerHTML = '<div class="text-center py-4"><svg class="w-6 h-6 mx-auto animate-spin text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>';
+  document.getElementById('sessionsList').innerHTML = '<div class="text-center py-4"><svg class="w-6 h-6 mx-auto animate-spin text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>';
   
   setTimeout(() => {
     renderStats(filtered);

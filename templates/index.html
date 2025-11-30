@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>MG4 Charger Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -137,12 +137,15 @@
   </div>
 
   <!-- Header -->
-  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors">
+  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors pt-[env(safe-area-inset-top)]">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
       <h1 class="text-xl font-semibold text-gray-900 dark:text-white">MG4 Charger</h1>
       <div class="flex items-center space-x-2">
         <button onclick="toggleDarkMode()" id="darkModeBtn" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition" title="Toggle dark mode">
-          <span id="darkModeIcon">🌙</span>
+          <span id="darkModeIcon">
+            <svg class="w-5 h-5 hidden dark:block" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"></path></svg>
+            <svg class="w-5 h-5 block dark:hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+          </span>
         </button>
         <button onclick="location.href='/calculator'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">Amps Calculator</button>
         <button onclick="location.href='/settings'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">Settings</button>
@@ -284,14 +287,12 @@ function initDarkMode() {
     (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches);
   if (isDark) {
     document.documentElement.classList.add('dark');
-    document.getElementById('darkModeIcon').innerText = '☀️';
   }
 }
 
 function toggleDarkMode() {
   const isDark = document.documentElement.classList.toggle('dark');
   localStorage.setItem('darkMode', isDark);
-  document.getElementById('darkModeIcon').innerText = isDark ? '☀️' : '🌙';
 }
 
 initDarkMode();
@@ -378,7 +379,7 @@ function renderControlButtons(){
       <button class="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-gray-300 dark:bg-gray-600 cursor-not-allowed" disabled>Start</button>
       <button class="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-gray-300 dark:bg-gray-600 cursor-not-allowed" disabled>Stop</button>
     `;
-    note.innerText = '⏳ Waiting for charger data...';
+    note.innerHTML = '<svg class="inline w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Waiting for charger data...';
     return;
   }
 

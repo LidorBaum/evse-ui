@@ -160,8 +160,8 @@ def _load_settings() -> dict:
     defaults = {
         "clock_start": "07:00",
         "clock_end": "23:00",
-        "users": ["Lidor", "Bar"],
-        "price_per_kwh": 0.55,
+        "users": ["User"],
+        "price_per_kwh": 0.64,
         "clock_discount_percent": 20,  # 20% off during clock hours
         "battery_capacity_kwh": 64.0,  # MG4 default
     }
