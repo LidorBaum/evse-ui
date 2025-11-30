@@ -46,7 +46,7 @@
   <div class="card">
     <label class="muted">Balancing Time (minutes)</label>
     <input type="number" id="balancingMinutes" min="0" value="0" inputmode="numeric" />
-    <div class="muted" style="margin-top:6px;">Time the car pauses for cell balancing</div>
+    <div class="muted" style="margin-top:6px;">Extra time when charging slows near full to equalize cell voltages</div>
   </div>
 
   <div class="result" id="result">
@@ -114,7 +114,9 @@ function calculate() {
   // Calculate
   const percentNeeded = targetPercent - currentPercent;
   const energyNeeded = (percentNeeded / 100) * batteryCapacity; // kWh
-  const actualChargingHours = availableHours - (balancingMinutes / 60);
+  // Apply 10% safety margin to available time
+  const safeAvailableHours = availableHours * 0.9;
+  const actualChargingHours = safeAvailableHours - (balancingMinutes / 60);
 
   if (actualChargingHours <= 0) {
     resultEl.style.display = 'block';
@@ -161,7 +163,7 @@ function calculate() {
   detailsCard.style.display = 'block';
   document.getElementById('detailCapacity').innerText = batteryCapacity + ' kWh';
   document.getElementById('detailEnergy').innerText = energyNeeded.toFixed(1) + ' kWh';
-  document.getElementById('detailTime').innerText = actualChargingHours.toFixed(1) + ' hours';
+  document.getElementById('detailTime').innerText = actualChargingHours.toFixed(1) + ' hours (incl. 10% buffer)';
   document.getElementById('detailPower').innerText = requiredPowerKw.toFixed(2) + ' kW';
 }
 
