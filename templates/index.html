@@ -77,34 +77,34 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-    /* Charging animation */
+    /* Charging animation - synced across cards */
     @keyframes pulse-glow {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-      50% { box-shadow: 0 0 20px 10px rgba(16, 185, 129, 0.2); }
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.3); }
+      50% { box-shadow: 0 0 15px 5px rgba(16, 185, 129, 0.15); }
     }
     @keyframes energy-flow {
       0% { background-position: 200% 0; }
       100% { background-position: -200% 0; }
     }
     .charging-active {
-      animation: pulse-glow 2s ease-in-out infinite;
+      animation: pulse-glow 3s ease-in-out infinite;
     }
     .charging-bar {
       background: linear-gradient(90deg, 
         transparent 0%, 
-        rgba(16, 185, 129, 0.3) 25%, 
-        rgba(16, 185, 129, 0.6) 50%, 
-        rgba(16, 185, 129, 0.3) 75%, 
+        rgba(16, 185, 129, 0.2) 30%, 
+        rgba(16, 185, 129, 0.4) 50%, 
+        rgba(16, 185, 129, 0.2) 70%, 
         transparent 100%);
       background-size: 200% 100%;
-      animation: energy-flow 1.5s linear infinite;
+      animation: energy-flow 4s ease-in-out infinite;
     }
     @keyframes bolt-pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(1.1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
     }
     .bolt-animate {
-      animation: bolt-pulse 1s ease-in-out infinite;
+      animation: bolt-pulse 2s ease-in-out infinite;
     }
   </style>
 </head>
@@ -154,10 +154,10 @@
 
     <!-- Amps Slider -->
     <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
-      <div class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Max Amps: <span id="ampsVal">-</span>A</div>
+      <div class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Max Amps: <span id="ampsVal">N/A</span></div>
       <input id="amps" type="range" min="6" max="16" step="1" disabled
          class="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed accent-emerald-500"
-         oninput="ampsVal.innerText=this.value"
+         oninput="ampsVal.innerText=this.value+'A'"
          onchange="setAmps()" />
     </div>
 
@@ -181,9 +181,13 @@
       </div>
 
       <!-- Telemetry Card -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Telemetry</h2>
-        <div id="telemetry" class="space-y-1"></div>
+      <div id="telemetryCard" class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors relative overflow-hidden">
+        <!-- Charging animation bar (synced with Status) -->
+        <div id="chargingBarTelemetry" class="absolute inset-0 charging-bar opacity-0 pointer-events-none transition-opacity duration-500"></div>
+        <div class="relative z-10">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Telemetry</h2>
+          <div id="telemetry" class="space-y-1"></div>
+        </div>
       </div>
     </div>
 
@@ -236,18 +240,26 @@ function toggleDemoMode() {
 
 function updateChargingAnimation(charging) {
   const statusCard = document.getElementById('statusCard');
+  const telemetryCard = document.getElementById('telemetryCard');
   const chargingBar = document.getElementById('chargingBar');
+  const chargingBarTelemetry = document.getElementById('chargingBarTelemetry');
   const chargingBolt = document.getElementById('chargingBolt');
   
   if (charging) {
     statusCard.classList.add('charging-active');
+    telemetryCard.classList.add('charging-active');
     chargingBar.classList.remove('opacity-0');
     chargingBar.classList.add('opacity-100');
+    chargingBarTelemetry.classList.remove('opacity-0');
+    chargingBarTelemetry.classList.add('opacity-100');
     chargingBolt.classList.remove('hidden');
   } else {
     statusCard.classList.remove('charging-active');
+    telemetryCard.classList.remove('charging-active');
     chargingBar.classList.add('opacity-0');
     chargingBar.classList.remove('opacity-100');
+    chargingBarTelemetry.classList.add('opacity-0');
+    chargingBarTelemetry.classList.remove('opacity-100');
     chargingBolt.classList.add('hidden');
   }
 }
@@ -631,10 +643,10 @@ async function load(){
   if (!lockActive || telemMatchesPending){
     if (telemMatchesPending) pendingAmps = null;
     document.getElementById('amps').value = telemAmps ?? 16;
-    document.getElementById('ampsVal').innerText = telemAmps ?? '-';
+    document.getElementById('ampsVal').innerText = telemAmps != null ? telemAmps + 'A' : 'N/A';
   } else {
     document.getElementById('amps').value = pendingAmps;
-    document.getElementById('ampsVal').innerText = pendingAmps;
+    document.getElementById('ampsVal').innerText = pendingAmps + 'A';
   }
 
   const wasCharging = isCharging;
@@ -721,7 +733,7 @@ ampsEl.addEventListener('touchend', dragEnd);
 ampsEl.addEventListener('mouseup',  dragEnd);
 
 ampsEl.addEventListener('input', (e) => {
-  document.getElementById('ampsVal').innerText = e.target.value;
+  document.getElementById('ampsVal').innerText = e.target.value + 'A';
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(setAmps, 600);
 });
