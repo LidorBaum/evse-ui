@@ -80,8 +80,6 @@
 
 <script>
 let batteryCapacity = 64; // Default, loaded from settings
-const VOLTAGE = 230; // Volts per phase
-const PHASES = 3;
 
 async function loadSettings() {
   try {
@@ -129,10 +127,9 @@ function calculate() {
 
   const requiredPowerKw = energyNeeded / actualChargingHours;
   
-  // For 3-phase: P = √3 × V × I × cos(φ) ≈ 1.73 × 230 × I × 1
-  // So I = P / (1.73 × 230) = P / 398 (in watts)
-  // Or for kW: I = P_kW × 1000 / 398
-  const requiredAmps = (requiredPowerKw * 1000) / (Math.sqrt(3) * VOLTAGE);
+  // Formula: Amps = (energyNeeded × 16) / (10 × effectiveTime)
+  // Which equals: energyNeeded × 1.6 / effectiveTime
+  const requiredAmps = (energyNeeded * 16) / (10 * actualChargingHours);
 
   // Show result
   resultEl.style.display = 'block';
