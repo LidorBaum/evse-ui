@@ -1,11 +1,32 @@
-# ⚡ MG4 Charger Dashboard
+# ⚡ EVSE-UI
 
-A beautiful, modern web dashboard for controlling and monitoring your Besen BS20 EV charger via Raspberry Pi.
+A beautiful, modern web dashboard for controlling and monitoring your EV charger via Raspberry Pi. Fully responsive for mobile and desktop.
 
-![Dashboard Preview](https://img.shields.io/badge/Made%20for-MG4-00B140?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xOSA3aC0xVjZhMSAxIDAgMCAwLTEtMUg3YTEgMSAwIDAgMC0xIDF2MUg1YTMgMyAwIDAgMC0zIDN2OGEzIDMgMCAwIDAgMyAzaDE0YTMgMyAwIDAgMCAzLTNWMTBhMyAzIDAgMCAwLTMtM3ptMSAxMWExIDEgMCAwIDEtMSAxSDVhMSAxIDAgMCAxLTEtMXYtOGExIDEgMCAwIDEgMS0xaDE0YTEgMSAwIDAgMSAxIDF2OHoiLz48L3N2Zz4=)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Responsive](https://img.shields.io/badge/Responsive-Mobile%20%26%20Desktop-blueviolet?style=for-the-badge)
+
+## 📸 Screenshots
+
+<table>
+  <tr>
+    <td align="center"><strong>Dashboard</strong></td>
+    <td align="center"><strong>Settings</strong></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/32fa96e3-8357-4d11-bc15-c7b9f575c096" width="300"/></td>
+    <td><img src="https://github.com/user-attachments/assets/5d93a3ce-9fc0-4772-a578-849d8e35d71c" width="300"/></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Sessions</strong></td>
+    <td align="center"><strong>Amps Calculator</strong></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/8195a02d-07c2-465a-a827-b8fea067d9bf" width="300"/></td>
+    <td><img src="https://github.com/user-attachments/assets/d408c474-9718-4021-800f-5084e0d9e4eb" width="300"/></td>
+  </tr>
+</table>
 
 ## ✨ Features
 
@@ -56,23 +77,25 @@ A beautiful, modern web dashboard for controlling and monitoring your Besen BS20
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Raspberry Pi with Bluetooth
-- Besen BS20 EV Charger
-- [evseMQTT](https://github.com/example/evseMQTT) bridge running
+- Raspberry Pi with Bluetooth & WiFi
+- EV Charger compatible with [EVSE Master](https://play.google.com/store/apps/details?id=com.evse.master) app (e.g., Besen BS20)
+- [evseMQTT](https://github.com/slespersen/evseMQTT) bridge running
 - Python 3.10+
+
+> 📖 For a complete step-by-step setup guide including Raspberry Pi configuration, see [GUIDE.md](GUIDE.md)
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/evse-ui.git
+   git clone https://github.com/LidorBaum/evse-ui.git
    cd evse-ui
    ```
 
 2. **Create virtual environment**
    ```bash
-   python -m venv venv
-   source venv/bin/activate
+   python3 -m venv .venv
+   source .venv/bin/activate
    ```
 
 3. **Install dependencies**
@@ -88,11 +111,11 @@ A beautiful, modern web dashboard for controlling and monitoring your Besen BS20
 
 5. **Run the server**
    ```bash
-   uvicorn server:app --host 0.0.0.0 --port 8000
+   uvicorn server:app --host 0.0.0.0 --port 8080
    ```
 
 6. **Access the dashboard**
-   Open `http://your-pi-ip:8000` in your browser
+   Open `http://your-pi-ip:8080` in your browser
 
 ## ⚙️ Configuration
 
@@ -123,24 +146,32 @@ Create `/etc/systemd/system/evse-ui.service`:
 
 ```ini
 [Unit]
-Description=EVSE UI Dashboard
-After=network.target
+Description=EVSE-UI Web Dashboard
+After=network.target mosquitto.service evseMQTT.service
+Wants=mosquitto.service evseMQTT.service
 
 [Service]
-Type=simple
 User=pi
 WorkingDirectory=/home/pi/evse-ui
-Environment=PATH=/home/pi/evse-ui/venv/bin
-ExecStart=/home/pi/evse-ui/venv/bin/uvicorn server:app --host 0.0.0.0 --port 8000
+Environment=MQTT_HOST=localhost
+Environment=MQTT_PORT=1883
+Environment=CMD_TOPIC=evseMQTT/YOUR_CHARGER_SERIAL/command
+Environment=START_PAYLOAD={"charge_state": 1}
+Environment=STOP_PAYLOAD={"charge_state": 0}
+Environment=AMPS_PAYLOAD_TEMPLATE={"charge_amps": {amps}}
+ExecStart=/home/pi/evse-ui/.venv/bin/uvicorn server:app --host 0.0.0.0 --port 8080
 Restart=always
-RestartSec=10
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+> ⚠️ Replace `pi` with your username and `YOUR_CHARGER_SERIAL` with your charger's serial number.
+
 Enable and start:
 ```bash
+sudo systemctl daemon-reload
 sudo systemctl enable evse-ui
 sudo systemctl start evse-ui
 ```
@@ -160,6 +191,7 @@ sudo systemctl start evse-ui
 ```
 evse-ui/
 ├── server.py           # FastAPI backend
+├── send_sessions.py    # Daily backup script (for cron)
 ├── templates/          # HTML templates
 │   ├── index.html      # Main dashboard
 │   ├── settings.html   # Settings page
@@ -170,6 +202,7 @@ evse-ui/
 ├── settings.json       # User settings (auto-created)
 ├── .env                # Environment config
 ├── env.example         # Example config
+├── GUIDE.md            # Complete setup guide
 └── requirements.txt    # Python dependencies
 ```
 
@@ -200,9 +233,9 @@ MIT License - feel free to use and modify!
 
 ## 🙏 Acknowledgments
 
-- [evseMQTT](https://github.com/example/evseMQTT) for the BLE-MQTT bridge
+- [evseMQTT](https://github.com/slespersen/evseMQTT) for the BLE-MQTT bridge
 - [Tailwind CSS](https://tailwindcss.com) for the beautiful styling
-- The MG4 community for inspiration
+- [Tailscale](https://tailscale.com) for easy remote access
 
 ---
 
