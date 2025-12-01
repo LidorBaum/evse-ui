@@ -55,14 +55,14 @@
     <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
       <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Clock Hours</h2>
       <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Charging schedule window (used by charger timer feature)</p>
-      <div class="grid grid-cols-2 gap-3 sm:gap-4 mt-4">
-        <div>
+      <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
+        <div class="flex-1">
           <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Start</label>
-          <input type="time" id="clockStart" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-2 sm:px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
+          <input type="time" id="clockStart" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
         </div>
-        <div>
+        <div class="flex-1">
           <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">End</label>
-          <input type="time" id="clockEnd" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-2 sm:px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
+          <input type="time" id="clockEnd" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
         </div>
       </div>
       <div class="mt-4">
