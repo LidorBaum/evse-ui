@@ -8,6 +8,12 @@
   <script>
     tailwind.config = { darkMode: 'class' }
   </script>
+  <script>
+    // Apply dark mode immediately to prevent flash - default to dark
+    if (localStorage.getItem('darkMode') !== 'false') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
   <style>
     body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     button {
@@ -127,9 +133,10 @@
 <script>
 // Dark mode init
 (function() {
-  const isDark = localStorage.getItem('darkMode') === 'true' || 
-    (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  // Dark mode is already applied in head, this just ensures consistency
+  const isDark = localStorage.getItem('darkMode') !== 'false';
   if (isDark) document.documentElement.classList.add('dark');
+  else document.documentElement.classList.remove('dark');
 })();
 
 let batteryCapacity = 64;

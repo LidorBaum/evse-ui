@@ -10,6 +10,12 @@
       darkMode: 'class',
     }
   </script>
+  <script>
+    // Apply dark mode immediately to prevent flash - default to dark
+    if (localStorage.getItem('darkMode') !== 'false') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
   <style>
     :root {
       --primary-green: #10B981;
@@ -281,13 +287,11 @@ function updateChargingAnimation(charging) {
   }
 }
 
-// Dark mode
+// Dark mode - default is dark, only light if explicitly set to 'false'
 function initDarkMode() {
-  const isDark = localStorage.getItem('darkMode') === 'true' || 
-    (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  if (isDark) {
-    document.documentElement.classList.add('dark');
-  }
+  const isDark = localStorage.getItem('darkMode') !== 'false';
+  if (isDark) document.documentElement.classList.add('dark');
+  else document.documentElement.classList.remove('dark');
 }
 
 function toggleDarkMode() {
