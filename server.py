@@ -205,6 +205,7 @@ latest_charge: dict = {}
 latest_config: dict = {}
 availability: str = "unknown"
 last_mqtt_update: float = 0.0  # timestamp of last MQTT message received
+_last_known_amps: int | None = None  # Track amps for change notifications
 
 # Command verification system
 _pending_command: dict | None = None  # {"type": "start"|"stop"|"amps", "expected": ..., "initial_state": ..., "sent_at": timestamp}
@@ -504,10 +505,22 @@ def on_message(client, userdata, msg):
         elif not is_error:
             _last_error_notified = None
     elif topic.endswith("/state/config"):
+        global _last_known_amps
         try:
-            latest_config = json.loads(payload)
+            new_config = json.loads(payload)
         except Exception:
-            latest_config = {"raw": payload}
+            new_config = {"raw": payload}
+        
+        # Check for amps change during charging
+        new_amps = new_config.get("charge_amps")
+        if new_amps is not None and _last_known_amps is not None:
+            if new_amps != _last_known_amps and _get_current_energy() > 0:
+                # Amps changed while charging - notify
+                direction = "⬆️" if new_amps > _last_known_amps else "⬇️"
+                _send_telegram(f"{direction} <b>Amps Changed</b>\n🔌 {_last_known_amps}A → {new_amps}A")
+        
+        _last_known_amps = new_amps
+        latest_config = new_config
 
 
 _load_sessions()
