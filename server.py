@@ -207,8 +207,17 @@ availability: str = "unknown"
 last_mqtt_update: float = 0.0  # timestamp of last MQTT message received
 
 # Command verification system
-_pending_command: dict | None = None  # {"type": "start"|"stop"|"amps", "expected": ..., "sent_at": timestamp}
+_pending_command: dict | None = None  # {"type": "start"|"stop"|"amps", "expected": ..., "initial_state": ..., "sent_at": timestamp}
 _command_verify_timeout = 12  # seconds to wait before checking
+
+
+def _get_current_energy():
+    """Get current energy value from latest charge data."""
+    energy = latest_charge.get("current_energy")
+    try:
+        return float(energy) if energy is not None else 0
+    except (TypeError, ValueError):
+        return 0
 
 
 def _verify_command():
@@ -221,21 +230,24 @@ def _verify_command():
     _pending_command = None
     
     cmd_type = cmd.get("type")
+    initial_state = cmd.get("initial_state", {})
     success = False
     
-    # Check if the expected state was reached
-    energy = latest_charge.get("current_energy")
-    try:
-        energy_val = float(energy) if energy is not None else 0
-    except (TypeError, ValueError):
-        energy_val = 0
+    energy_val = _get_current_energy()
     
     if cmd_type == "start":
-        # Expect charging (energy > 0)
-        success = energy_val > 0
+        # Expect charging (energy > 0) OR state changed from not-charging to charging
+        initial_energy = initial_state.get("energy", 0)
+        success = energy_val > 0 or (initial_energy == 0 and energy_val > initial_energy)
     elif cmd_type == "stop":
-        # Expect not charging (energy = 0)
-        success = energy_val == 0
+        # Expect state changed: energy decreased or went to 0, OR output_state changed
+        initial_energy = initial_state.get("energy", 0)
+        # Success if: was charging and now not, OR energy decreased significantly
+        if initial_energy > 0:
+            success = energy_val == 0 or energy_val < initial_energy
+        else:
+            # Wasn't charging before - can't verify stop, assume ok
+            success = True
     elif cmd_type == "amps":
         # Expect amps to match
         current_amps = latest_config.get("charge_amps")
@@ -251,7 +263,17 @@ def _verify_command():
 def _schedule_command_verify(cmd_type: str, expected: any = None):
     """Schedule verification of a command after timeout."""
     global _pending_command
-    _pending_command = {"type": cmd_type, "expected": expected, "sent_at": time.time()}
+    # Capture initial state before command executes
+    initial_state = {
+        "energy": _get_current_energy(),
+        "amps": latest_config.get("charge_amps"),
+    }
+    _pending_command = {
+        "type": cmd_type,
+        "expected": expected,
+        "initial_state": initial_state,
+        "sent_at": time.time()
+    }
     
     def verify_later():
         time.sleep(_command_verify_timeout)

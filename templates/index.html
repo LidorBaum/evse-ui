@@ -282,6 +282,7 @@ let debounceTimer = null;
 // optimistic lock
 let pendingAmps = null;
 let lockUntilTs = 0;
+let lastAmps = null;  // Track current amps for verification
 
 let clockSettings = { clock_start: '07:00', clock_end: '23:00' };
 let isCharging = false;
@@ -465,8 +466,7 @@ function renderControlButtons(){
   if (withinClock) {
     const label = isCharging ? 'Stop ⏹️' : 'Start ▶️';
     const bgClass = isCharging ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500 hover:bg-emerald-600';
-    // Clock mode: charger is a toggle, same command (start) for both start and stop
-    container.innerHTML = `<button class="ripple flex-1 py-3 px-4 rounded-xl font-bold text-white transition cursor-pointer ${bgClass}" onclick="handleStartClick(this)">${label}</button>`;
+    container.innerHTML = `<button class="ripple flex-1 py-3 px-4 rounded-xl font-bold text-white transition cursor-pointer ${bgClass}" onclick="handleControlClick(this, '/api/stop')">${label}</button>`;
     note.innerText = '🕐 Clock mode active – toggle charging with one button';
   } else {
     container.innerHTML = `
@@ -527,10 +527,26 @@ async function startWithUser(){
 
 async function setAmps(){
   const v = Number(document.getElementById('amps').value);
+  const oldAmps = lastAmps;
   pendingAmps = v;
   lockUntilTs = Date.now() + 4000;
   await post('/api/amps/' + v);
   setTimeout(load, 800);
+  
+  // Verify amps change
+  verifyAmpsCommand(v, oldAmps);
+}
+
+async function verifyAmpsCommand(expectedAmps, oldAmps, timeout = 8000){
+  await new Promise(r => setTimeout(r, timeout));
+  await load(); // Refresh state
+  
+  if (lastAmps === expectedAmps) {
+    return true; // Success
+  }
+  
+  showToast(`⚠️ AMPS command may have failed - still at ${lastAmps}A`, 'warning');
+  return false;
 }
 
 function kv(k, v, highlight = false){
@@ -743,6 +759,7 @@ async function load(){
   const cfg = data.config || {};
 
   const telemAmps = cfg.charge_amps;
+  lastAmps = telemAmps;  // Track for verification
 
   const lockActive = pendingAmps !== null && Date.now() < lockUntilTs;
   const telemMatchesPending = pendingAmps !== null && telemAmps === pendingAmps;
