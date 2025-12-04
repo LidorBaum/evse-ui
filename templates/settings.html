@@ -102,8 +102,11 @@
     <!-- Bluetooth Control -->
     <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
       <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Bluetooth Control</h2>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Pause BLE bridge to connect with phone app</p>
-      <button onclick="pauseBle(60)" class="mt-3 w-full py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer">Pause 60s</button>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage BLE bridge connection</p>
+      <div class="grid grid-cols-2 gap-3 mt-3">
+        <button onclick="pauseBle(60)" class="py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer">Pause 60s</button>
+        <button onclick="restartBle(this)" class="py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer">Restart BLE 🔄</button>
+      </div>
       <p class="text-sm text-emerald-600 dark:text-emerald-400 mt-2" id="pauseNote"></p>
     </div>
 
@@ -162,6 +165,32 @@ async function pauseBle(sec){
         "BLE paused for " + sec + "s. You can connect with your phone app now.";
     }
   } catch(e) {}
+}
+
+async function restartBle(btn){
+  const noteEl = document.getElementById('pauseNote');
+  btn.classList.add('btn-loading');
+  btn.disabled = true;
+  noteEl.innerText = '';
+  
+  try {
+    const r = await fetch('/api/restart_ble', {method: 'POST'});
+    const data = await r.json();
+    
+    if (data.ok) {
+      noteEl.innerText = '✅ evseMQTT restarting... BLE will reconnect in a few seconds.';
+      noteEl.className = 'text-sm mt-2 text-emerald-600 dark:text-emerald-400';
+    } else {
+      noteEl.innerText = '⚠️ ' + (data.error || 'Failed to restart');
+      noteEl.className = 'text-sm mt-2 text-amber-600 dark:text-amber-400';
+    }
+  } catch(e) {
+    noteEl.innerText = '❌ Failed to restart BLE';
+    noteEl.className = 'text-sm mt-2 text-red-500';
+  }
+  
+  btn.classList.remove('btn-loading');
+  btn.disabled = false;
 }
 
 async function testTelegram(btn){

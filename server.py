@@ -206,6 +206,61 @@ latest_config: dict = {}
 availability: str = "unknown"
 last_mqtt_update: float = 0.0  # timestamp of last MQTT message received
 
+# Command verification system
+_pending_command: dict | None = None  # {"type": "start"|"stop"|"amps", "expected": ..., "sent_at": timestamp}
+_command_verify_timeout = 12  # seconds to wait before checking
+
+
+def _verify_command():
+    """Check if the pending command was executed successfully."""
+    global _pending_command
+    if _pending_command is None:
+        return
+    
+    cmd = _pending_command
+    _pending_command = None
+    
+    cmd_type = cmd.get("type")
+    success = False
+    
+    # Check if the expected state was reached
+    energy = latest_charge.get("current_energy")
+    try:
+        energy_val = float(energy) if energy is not None else 0
+    except (TypeError, ValueError):
+        energy_val = 0
+    
+    if cmd_type == "start":
+        # Expect charging (energy > 0)
+        success = energy_val > 0
+    elif cmd_type == "stop":
+        # Expect not charging (energy = 0)
+        success = energy_val == 0
+    elif cmd_type == "amps":
+        # Expect amps to match
+        current_amps = latest_config.get("charge_amps")
+        expected_amps = cmd.get("expected")
+        success = current_amps == expected_amps
+    
+    if not success:
+        # Send Telegram alert
+        cmd_name = cmd_type.upper()
+        _send_telegram(f"⚠️ <b>Command may have failed</b>\n🔌 {cmd_name} command sent but state didn't change as expected.\nCheck charger/BLE connection.")
+
+
+def _schedule_command_verify(cmd_type: str, expected: any = None):
+    """Schedule verification of a command after timeout."""
+    global _pending_command
+    _pending_command = {"type": cmd_type, "expected": expected, "sent_at": time.time()}
+    
+    def verify_later():
+        time.sleep(_command_verify_timeout)
+        _verify_command()
+    
+    t = threading.Thread(target=verify_later, daemon=True)
+    t.start()
+
+
 # Very small in‑memory session store, persisted to JSON.
 sessions: list[dict] = []
 current_session: dict | None = None
@@ -544,6 +599,13 @@ def api_pause_ble(seconds: int):
     return {"ok": True, "paused_for": seconds}
 
 
+@app.post("/api/restart_ble")
+def api_restart_ble():
+    """Restart evseMQTT service to reconnect Bluetooth."""
+    subprocess.run(["sudo", "systemctl", "restart", "evseMQTT"], check=False)
+    return {"ok": True, "message": "evseMQTT service restarted"}
+
+
 @app.post("/api/telegram/test")
 def api_telegram_test():
     """Send a test message to Telegram."""
@@ -664,12 +726,14 @@ def api_start_for(user: str):
     amps = latest_config.get("charge_amps") or 16
     payload = json.dumps({"charge_state": 1, "charge_amps": int(amps)})
     publish(payload)
+    _schedule_command_verify("start")
     return {"ok": True, "amps": amps, "user": user}
 
 
 @app.post("/api/stop")
 def api_stop():
     publish(STOP_PAYLOAD)
+    _schedule_command_verify("stop")
     return {"ok": True}
 
 
@@ -677,6 +741,7 @@ def api_stop():
 def api_amps(amps: int):
     payload = json.dumps({"charge_amps": amps})
     publish(payload)
+    _schedule_command_verify("amps", expected=amps)
     return {"ok": True, "amps": amps}
 
 

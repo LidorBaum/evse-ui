@@ -36,6 +36,40 @@
       transform: scale(0.97);
       opacity: 0.9;
     }
+    /* Toast notifications */
+    .toast-container {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      padding: 12px 20px;
+      border-radius: 10px;
+      color: white;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      animation: slideUp 0.3s ease;
+      max-width: 90vw;
+    }
+    .toast-warning {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+    .toast-error {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
     /* Ripple effect */
     .ripple {
       position: relative;
@@ -141,6 +175,9 @@
       <button onclick="dismissErrorAlert()" class="text-white hover:text-red-100 text-xl">&times;</button>
     </div>
   </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
 
   <!-- Header -->
   <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors pt-[env(safe-area-inset-top)]">
@@ -365,6 +402,35 @@ async function saveSelectedUser(){
   });
 }
 
+function showToast(message, type = 'warning', duration = 5000){
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = 'fadeOut 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+// Command verification - check if state changed as expected
+async function verifyCommand(expectedCharging, commandName, timeout = 10000){
+  const startState = isCharging;
+  await new Promise(r => setTimeout(r, timeout));
+  await load(); // Refresh state
+  
+  if (isCharging === expectedCharging) {
+    // Success - state changed as expected
+    return true;
+  }
+  
+  // State didn't change - show warning
+  showToast(`⚠️ ${commandName} command may have failed - state unchanged`, 'warning');
+  return false;
+}
+
 function isWithinClockHours(){
   const now = new Date();
   const jerusalemTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
@@ -399,7 +465,8 @@ function renderControlButtons(){
   if (withinClock) {
     const label = isCharging ? 'Stop ⏹️' : 'Start ▶️';
     const bgClass = isCharging ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500 hover:bg-emerald-600';
-    container.innerHTML = `<button class="ripple flex-1 py-3 px-4 rounded-xl font-bold text-white transition cursor-pointer ${bgClass}" onclick="handleControlClick(this, '/api/stop')">${label}</button>`;
+    // Clock mode: charger is a toggle, same command (start) for both start and stop
+    container.innerHTML = `<button class="ripple flex-1 py-3 px-4 rounded-xl font-bold text-white transition cursor-pointer ${bgClass}" onclick="handleStartClick(this)">${label}</button>`;
     note.innerText = '🕐 Clock mode active – toggle charging with one button';
   } else {
     container.innerHTML = `
@@ -420,26 +487,37 @@ async function post(url){
   }
 }
 
-// Button click handlers with loading animation
+// Button click handlers with loading animation and verification
 async function handleControlClick(btn, url) {
   btn.classList.add('btn-loading');
   btn.disabled = true;
+  const wasCharging = isCharging;
   await post(url);
   setTimeout(() => {
     btn.classList.remove('btn-loading');
     btn.disabled = false;
   }, 800);
+  
+  // Verify stop command executed (expect not charging)
+  if (url.includes('/api/stop')) {
+    verifyCommand(false, 'STOP');
+  }
 }
 
 async function handleStartClick(btn) {
   btn.classList.add('btn-loading');
   btn.disabled = true;
+  const wasCharging = isCharging;
   const user = encodeURIComponent(currentUser());
   await post('/api/start_for/' + user);
   setTimeout(() => {
     btn.classList.remove('btn-loading');
     btn.disabled = false;
   }, 800);
+  
+  // For toggle mode (clock), expect opposite state; otherwise expect charging
+  const expectedState = isWithinClockHours() ? !wasCharging : true;
+  verifyCommand(expectedState, wasCharging ? 'STOP' : 'START');
 }
 
 async function startWithUser(){
