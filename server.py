@@ -161,6 +161,7 @@ def _load_settings() -> dict:
         "clock_start": "07:00",
         "clock_end": "23:00",
         "users": ["User"],
+        "selected_user": "User",  # Currently selected user for new sessions
         "price_per_kwh": 0.64,
         "clock_discount_percent": 20,  # 20% off during clock hours
         "battery_capacity_kwh": 64.0,  # MG4 default
@@ -203,7 +204,6 @@ app = FastAPI()
 latest_charge: dict = {}
 latest_config: dict = {}
 availability: str = "unknown"
-last_start_user: str | None = None
 last_mqtt_update: float = 0.0  # timestamp of last MQTT message received
 
 # Very small in‑memory session store, persisted to JSON.
@@ -340,7 +340,7 @@ def _update_sessions_from_charge(charge: dict):
         if current_session is None and is_active:
             # Start of a new session
             session_id = f"{int(time.time())}-{len(sessions)+1}"
-            user = last_start_user or "Unknown"
+            user = app_settings.get("selected_user") or "Unknown"
             current_session = {
                 "id": session_id,
                 "started_at": ts,
@@ -508,6 +508,8 @@ def api_post_settings(new_settings: dict):
         app_settings["clock_end"] = new_settings["clock_end"]
     if "users" in new_settings and isinstance(new_settings["users"], list):
         app_settings["users"] = new_settings["users"]
+    if "selected_user" in new_settings:
+        app_settings["selected_user"] = new_settings["selected_user"]
     if "price_per_kwh" in new_settings:
         try:
             app_settings["price_per_kwh"] = float(new_settings["price_per_kwh"])
@@ -653,8 +655,10 @@ def api_start():
 
 @app.post("/api/start_for/{user}")
 def api_start_for(user: str):
-    global last_start_user
-    last_start_user = user
+    global app_settings
+    # Save the user to settings (persisted to disk)
+    app_settings["selected_user"] = user
+    _save_settings(app_settings)
 
     # use last known amps from config; fallback to 16
     amps = latest_config.get("charge_amps") or 16

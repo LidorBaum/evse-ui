@@ -164,7 +164,7 @@
     <!-- User Section -->
     <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
       <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">User</h2>
-      <select id="userSelect" class="block w-full max-w-xs rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 pl-3 pr-10 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+      <select id="userSelect" onchange="saveSelectedUser()" class="block w-full max-w-xs rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 pl-3 pr-10 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm">
       </select>
       <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Selected user will be attached to new sessions.</p>
     </div>
@@ -354,6 +354,15 @@ function dismissErrorAlert() {
 function currentUser(){
   const sel = document.getElementById('userSelect');
   return sel ? sel.value : 'Unknown';
+}
+
+async function saveSelectedUser(){
+  const user = currentUser();
+  await fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({selected_user: user})
+  });
 }
 
 function isWithinClockHours(){
@@ -774,6 +783,11 @@ async function loadSettings(){
     const users = settings.users || ['Lidor', 'Bar'];
     const sel = document.getElementById('userSelect');
     sel.innerHTML = users.map(u => `<option value="${u}">${u}</option>`).join('');
+    
+    // Restore selected user from settings
+    if (settings.selected_user && users.includes(settings.selected_user)) {
+      sel.value = settings.selected_user;
+    }
 
     renderControlButtons();
   } catch(e) {}
