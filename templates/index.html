@@ -842,14 +842,17 @@ async function load(){
 }
 
 const ampsEl = document.getElementById('amps');
+let ampsSent = false;  // Prevent double-send on touchend + mouseup
 
-ampsEl.addEventListener('touchstart', () => { isDragging = true; });
-ampsEl.addEventListener('mousedown',  () => { isDragging = true; });
+ampsEl.addEventListener('touchstart', () => { isDragging = true; ampsSent = false; });
+ampsEl.addEventListener('mousedown',  () => { isDragging = true; ampsSent = false; });
 
 function dragEnd(){
+  if (ampsSent) return;  // Already sent
+  ampsSent = true;
   isDragging = false;
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(setAmps, 400);
+  setAmps();
 }
 
 ampsEl.addEventListener('touchend', dragEnd);
@@ -857,8 +860,6 @@ ampsEl.addEventListener('mouseup',  dragEnd);
 
 ampsEl.addEventListener('input', (e) => {
   document.getElementById('ampsVal').innerText = e.target.value + 'A';
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(setAmps, 600);
 });
 
 async function loadSettings(){
