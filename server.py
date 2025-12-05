@@ -610,6 +610,11 @@ def api_post_settings(new_settings: dict):
             app_settings["battery_capacity_kwh"] = float(new_settings["battery_capacity_kwh"])
         except (TypeError, ValueError):
             pass
+    if "clock_discount_percent" in new_settings:
+        try:
+            app_settings["clock_discount_percent"] = int(new_settings["clock_discount_percent"])
+        except (TypeError, ValueError):
+            pass
     _save_settings(app_settings)
     return {"ok": True, "settings": app_settings}
 
