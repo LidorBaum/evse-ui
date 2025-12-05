@@ -240,7 +240,9 @@ function updateMergePreview() {
   
   const first = allToMerge[0];
   const last = allToMerge[allToMerge.length - 1];
-  const totalEnergy = (last.end_amount_kwh || 0) - (first.start_amount_kwh || 0);
+  
+  // Sum up individual session energies
+  const totalEnergy = allToMerge.reduce((sum, s) => sum + getSessionEnergy(s), 0);
   
   document.getElementById('mergePreviewDetails').innerHTML = `
     <div>⚡ ${totalEnergy.toFixed(1)} kWh total</div>
