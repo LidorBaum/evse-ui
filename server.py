@@ -583,6 +583,146 @@ def api_session_note(session_id: str, body: dict):
     return {"ok": False, "error": "Session not found"}
 
 
+@app.get("/api/session/{session_id}/neighbors")
+def api_session_neighbors(session_id: str):
+    """Find neighboring sessions that can be merged (same user, within 30 min gap)."""
+    MAX_GAP_MINUTES = 30
+    
+    with _sessions_lock:
+        # Find the target session
+        all_sessions = sessions + ([current_session] if current_session else [])
+        target = None
+        target_idx = -1
+        
+        for i, s in enumerate(all_sessions):
+            if s.get("id") == session_id:
+                target = s
+                target_idx = i
+                break
+        
+        if target is None:
+            return {"ok": False, "error": "Session not found"}
+        
+        target_user = target.get("meta", {}).get("user", "Unknown")
+        target_start = target.get("started_at")
+        target_end = target.get("ended_at")
+        
+        neighbors = []
+        
+        # Check all other sessions
+        for i, s in enumerate(all_sessions):
+            if s.get("id") == session_id:
+                continue
+            
+            s_user = s.get("meta", {}).get("user", "Unknown")
+            if s_user != target_user:
+                continue
+            
+            s_start = s.get("started_at")
+            s_end = s.get("ended_at")
+            
+            # Check if within 30 min gap
+            try:
+                from datetime import datetime
+                
+                def parse_ts(ts):
+                    if ts is None:
+                        return None
+                    return datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                
+                t_start = parse_ts(target_start)
+                t_end = parse_ts(target_end)
+                s_start_dt = parse_ts(s_start)
+                s_end_dt = parse_ts(s_end)
+                
+                # Check if s ends just before target starts
+                if s_end_dt and t_start:
+                    gap = abs((t_start - s_end_dt).total_seconds() / 60)
+                    if gap <= MAX_GAP_MINUTES:
+                        neighbors.append(s)
+                        continue
+                
+                # Check if target ends just before s starts
+                if t_end and s_start_dt:
+                    gap = abs((s_start_dt - t_end).total_seconds() / 60)
+                    if gap <= MAX_GAP_MINUTES:
+                        neighbors.append(s)
+                        continue
+                        
+            except Exception:
+                continue
+        
+        return {"ok": True, "session": target, "neighbors": neighbors}
+
+
+@app.post("/api/sessions/merge")
+def api_sessions_merge(body: dict):
+    """Merge multiple sessions into one."""
+    global sessions
+    
+    session_ids = body.get("session_ids", [])
+    if len(session_ids) < 2:
+        return {"ok": False, "error": "Need at least 2 sessions to merge"}
+    
+    with _sessions_lock:
+        # Find all sessions to merge
+        to_merge = []
+        for s in sessions:
+            if s.get("id") in session_ids:
+                to_merge.append(s)
+        
+        if len(to_merge) < 2:
+            return {"ok": False, "error": "Could not find enough sessions to merge"}
+        
+        # Sort by start time
+        to_merge.sort(key=lambda x: x.get("started_at", ""))
+        
+        # Create merged session
+        first = to_merge[0]
+        last = to_merge[-1]
+        
+        # Use the user from the most recent session (or first non-Unknown)
+        user = "Unknown"
+        for s in reversed(to_merge):
+            u = s.get("meta", {}).get("user", "Unknown")
+            if u != "Unknown" and u != "Unknown (offline)":
+                user = u
+                break
+        
+        merged = {
+            "id": first.get("id"),  # Keep first session's ID
+            "started_at": first.get("started_at"),
+            "ended_at": last.get("ended_at"),
+            "start_amount_kwh": first.get("start_amount_kwh"),
+            "end_amount_kwh": last.get("end_amount_kwh"),
+            "session_energy_kwh": None,
+            "meta": {
+                "plug_state": last.get("meta", {}).get("plug_state"),
+                "output_state": last.get("meta", {}).get("output_state"),
+                "current_state": last.get("meta", {}).get("current_state"),
+                "user": user,
+                "merged_from": session_ids,
+            }
+        }
+        
+        # Calculate total energy
+        start_amt = merged.get("start_amount_kwh")
+        end_amt = merged.get("end_amount_kwh")
+        if start_amt is not None and end_amt is not None:
+            merged["session_energy_kwh"] = max(0.0, end_amt - start_amt)
+        
+        # Remove old sessions and add merged one
+        sessions = [s for s in sessions if s.get("id") not in session_ids]
+        sessions.append(merged)
+        
+        # Sort by start time
+        sessions.sort(key=lambda x: x.get("started_at", ""))
+        
+        _save_sessions()
+        
+        return {"ok": True, "merged": merged}
+
+
 @app.get("/api/settings")
 def api_get_settings():
     return app_settings

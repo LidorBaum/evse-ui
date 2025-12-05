@@ -101,6 +101,24 @@
     </div>
   </div>
 
+  <!-- Session Merge Modal -->
+  <div id="mergeModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4 shadow-xl">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">🔗 Merge Sessions</h3>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Select neighboring sessions to merge (same user, within 30 min)</p>
+      <input type="hidden" id="mergeMainSessionId" />
+      <div id="mergeSessionsList" class="max-h-64 overflow-y-auto space-y-2 mb-4"></div>
+      <div id="mergePreview" class="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg mb-4 hidden">
+        <div class="text-sm font-medium text-emerald-700 dark:text-emerald-300">Merged result:</div>
+        <div id="mergePreviewDetails" class="text-sm text-gray-600 dark:text-gray-400 mt-1"></div>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="closeMergeModal()" class="flex-1 py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
+        <button onclick="confirmMerge()" id="mergeConfirmBtn" disabled class="flex-1 py-2 px-4 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition">Merge Selected</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 // Note Modal functions
 function openNoteModal(sessionId, currentNote) {
@@ -130,6 +148,139 @@ async function saveNote() {
       loadSessions();
     }
   } catch(e) {}
+}
+
+// Merge Modal functions
+let mergeMainSession = null;
+let mergeNeighbors = [];
+let mergeSelected = new Set();
+
+async function openMergeModal(sessionId) {
+  mergeSelected.clear();
+  mergeSelected.add(sessionId);
+  
+  document.getElementById('mergeMainSessionId').value = sessionId;
+  document.getElementById('mergeSessionsList').innerHTML = '<div class="text-center py-4"><svg class="w-6 h-6 mx-auto animate-spin text-emerald-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle></svg></div>';
+  document.getElementById('mergePreview').classList.add('hidden');
+  document.getElementById('mergeConfirmBtn').disabled = true;
+  document.getElementById('mergeModal').classList.remove('hidden');
+  
+  try {
+    const r = await fetch('/api/session/' + sessionId + '/neighbors');
+    if (!r.ok) throw new Error('Failed to fetch');
+    const data = await r.json();
+    
+    if (!data.ok) {
+      document.getElementById('mergeSessionsList').innerHTML = '<div class="text-red-500">Error: ' + (data.error || 'Unknown error') + '</div>';
+      return;
+    }
+    
+    mergeMainSession = data.session;
+    mergeNeighbors = data.neighbors || [];
+    
+    if (mergeNeighbors.length === 0) {
+      document.getElementById('mergeSessionsList').innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-center py-4">No neighboring sessions found (same user, within 30 min gap)</div>';
+      return;
+    }
+    
+    renderMergeList();
+  } catch(e) {
+    document.getElementById('mergeSessionsList').innerHTML = '<div class="text-red-500">Failed to load neighbors</div>';
+  }
+}
+
+function renderMergeList() {
+  const allToShow = [mergeMainSession, ...mergeNeighbors].sort((a, b) => 
+    new Date(a.started_at) - new Date(b.started_at)
+  );
+  
+  const html = allToShow.map(s => {
+    const energy = getSessionEnergy(s).toFixed(1);
+    const isMain = s.id === mergeMainSession.id;
+    const isChecked = mergeSelected.has(s.id);
+    
+    return `<label class="flex items-center gap-3 p-3 rounded-lg border ${isChecked ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-gray-200 dark:border-gray-600'} cursor-pointer hover:border-emerald-400 transition">
+      <input type="checkbox" ${isChecked ? 'checked' : ''} ${isMain ? 'disabled' : ''} onchange="toggleMergeSession('${s.id}')" class="w-4 h-4 text-emerald-500 rounded focus:ring-emerald-500">
+      <div class="flex-1">
+        <div class="font-medium text-gray-900 dark:text-white">${energy} kWh ${isMain ? '<span class="text-xs text-emerald-500">(selected)</span>' : ''}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">${fmtDate(s.started_at)} → ${s.ended_at ? fmtDate(s.ended_at) : 'ongoing'}</div>
+      </div>
+    </label>`;
+  }).join('');
+  
+  document.getElementById('mergeSessionsList').innerHTML = html;
+  updateMergePreview();
+}
+
+function toggleMergeSession(sessionId) {
+  if (mergeSelected.has(sessionId)) {
+    mergeSelected.delete(sessionId);
+  } else {
+    mergeSelected.add(sessionId);
+  }
+  renderMergeList();
+}
+
+function updateMergePreview() {
+  const btn = document.getElementById('mergeConfirmBtn');
+  const preview = document.getElementById('mergePreview');
+  
+  if (mergeSelected.size < 2) {
+    btn.disabled = true;
+    preview.classList.add('hidden');
+    return;
+  }
+  
+  btn.disabled = false;
+  preview.classList.remove('hidden');
+  
+  // Calculate merged stats
+  const allToMerge = [mergeMainSession, ...mergeNeighbors].filter(s => mergeSelected.has(s.id));
+  allToMerge.sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+  
+  const first = allToMerge[0];
+  const last = allToMerge[allToMerge.length - 1];
+  const totalEnergy = (last.end_amount_kwh || 0) - (first.start_amount_kwh || 0);
+  
+  document.getElementById('mergePreviewDetails').innerHTML = `
+    <div>⚡ ${totalEnergy.toFixed(1)} kWh total</div>
+    <div>🕐 ${fmtDate(first.started_at)} → ${last.ended_at ? fmtDate(last.ended_at) : 'ongoing'}</div>
+    <div>📦 Merging ${mergeSelected.size} sessions</div>
+  `;
+}
+
+function closeMergeModal() {
+  document.getElementById('mergeModal').classList.add('hidden');
+}
+
+async function confirmMerge() {
+  if (mergeSelected.size < 2) return;
+  
+  const btn = document.getElementById('mergeConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Merging...';
+  
+  try {
+    const r = await fetch('/api/sessions/merge', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ session_ids: Array.from(mergeSelected) })
+    });
+    
+    const data = await r.json();
+    
+    if (data.ok) {
+      closeMergeModal();
+      loadSessions();
+    } else {
+      alert('Merge failed: ' + (data.error || 'Unknown error'));
+    }
+  } catch(e) {
+    alert('Merge failed: ' + e.message);
+  }
+  
+  btn.disabled = false;
+  btn.textContent = 'Merge Selected';
 }
 
 // Dark mode init
@@ -554,6 +705,7 @@ function fmtSession(s){
 
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
   const note = (s.meta && s.meta.note) ? s.meta.note : '';
+  const mergedFrom = (s.meta && s.meta.merged_from) ? s.meta.merged_from : null;
 
   return `<div class="py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 flex items-center gap-3">
     <div class="flex-1">
@@ -564,10 +716,14 @@ function fmtSession(s){
         <span class="text-gray-400 dark:text-gray-500">·</span>
         <span class="text-gray-600 dark:text-gray-400">${user}</span>
         ${ongoing ? '<span class="text-emerald-500 font-medium">🔌 Charging</span>' : ''}
+        ${mergedFrom ? '<span class="text-xs text-purple-500 dark:text-purple-400">🔗 merged</span>' : ''}
         ${note ? `<span class="text-gray-400 dark:text-gray-500">·</span><span class="text-amber-600 dark:text-amber-400 italic text-sm">${note}</span>` : ''}
       </div>
       <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">${start} → ${end}</div>
     </div>
+    ${!ongoing ? `<button onclick="openMergeModal('${s.id}')" class="text-gray-400 dark:text-gray-500 hover:text-purple-500 dark:hover:text-purple-400 px-2 transition" title="Merge with neighbors">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+    </button>` : ''}
     <button onclick="openNoteModal('${s.id}', '${note.replace(/'/g, "\\'")}')" class="text-gray-400 dark:text-gray-500 hover:text-emerald-500 dark:hover:text-emerald-400 px-2 transition" title="${note || 'Add note'}">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
     </button>
