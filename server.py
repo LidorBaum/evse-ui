@@ -305,12 +305,15 @@ def _load_sessions():
             data = json.load(f)
         # Backwards‑compat:
         #  - old format: plain list of sessions
-        #  - new format: {"sessions": [...], "current_session": {...}}
+        #  - new format: {"current_session": {...}, "sessions": [...]}
+        #  - File stores newest first, internally we keep oldest first
         if isinstance(data, list):
             sessions = data
             current_session = None
         elif isinstance(data, dict):
-            sessions = data.get("sessions") or []
+            loaded_sessions = data.get("sessions") or []
+            # Reverse back to oldest-first for internal use
+            sessions = list(reversed(loaded_sessions))
             cs = data.get("current_session")
             current_session = cs if isinstance(cs, dict) else None
         else:
@@ -325,9 +328,11 @@ def _save_sessions():
     # Called from MQTT thread; keep it simple and safe.
     try:
         tmp = SESSIONS_FILE + ".tmp"
+        # Newest sessions first, current_session at top of JSON
+        reversed_sessions = list(reversed(sessions[-MAX_SESSIONS:]))
         payload = {
-            "sessions": sessions[-MAX_SESSIONS:],
             "current_session": current_session,
+            "sessions": reversed_sessions,
         }
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)

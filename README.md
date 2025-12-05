@@ -46,6 +46,7 @@ A beautiful, modern web dashboard for controlling and monitoring your EV charger
 - **Energy & Cost** - Track kWh and estimated cost (with clock hour discounts!)
 - **Battery % Gain** - See how much battery you added
 - **Session Notes** - Add custom notes to any session
+- **Session Merging** - Merge neighboring sessions (same user, ≤30 min gap)
 - **Monthly Breakdown** - View stats by month
 - **User Filtering** - Filter history by user
 
@@ -54,8 +55,16 @@ A beautiful, modern web dashboard for controlling and monitoring your EV charger
   - 🔌 Charging started
   - ⚡ Charging complete (with energy, cost, battery %)
   - ⚠️ Charger errors
+  - ⬆️⬇️ Amps changed during charging
+  - ⚠️ Command verification failures (start/stop/amps)
 - **Browser Notifications** - Desktop/mobile alerts
+- **UI Toast Warnings** - Alert when commands may have failed
 - **Error Banner** - Visual alert on dashboard
+
+### 🔧 BLE Management
+- **Pause BLE** - Temporarily pause bridge to use phone app
+- **Restart BLE** - Reconnect Bluetooth if commands stop working
+- **Command Verification** - Automatic check if start/stop/amps executed
 
 ### 🧮 Amps Calculator
 - Calculate optimal charging amps based on:
@@ -217,8 +226,11 @@ evse-ui/
 | `/api/stop` | POST | Stop charging |
 | `/api/amps/{value}` | POST | Set charging amps |
 | `/api/session/{id}/note` | POST | Add note to session |
+| `/api/session/{id}/neighbors` | GET | Find mergeable neighbor sessions |
+| `/api/sessions/merge` | POST | Merge multiple sessions |
 | `/api/telegram/test` | POST | Send test notification |
 | `/api/pause_ble/{seconds}` | POST | Pause BLE bridge |
+| `/api/restart_ble` | POST | Restart BLE bridge (reconnect) |
 
 ## 🎨 Tech Stack
 
