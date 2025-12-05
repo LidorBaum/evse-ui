@@ -689,13 +689,22 @@ def api_sessions_merge(body: dict):
                 user = u
                 break
         
+        # Calculate total energy by summing individual session energies
+        total_energy = 0.0
+        for s in to_merge:
+            e = s.get("session_energy_kwh")
+            if e is not None:
+                total_energy += e
+            elif s.get("start_amount_kwh") is not None and s.get("end_amount_kwh") is not None:
+                total_energy += max(0.0, s.get("end_amount_kwh") - s.get("start_amount_kwh"))
+        
         merged = {
             "id": first.get("id"),  # Keep first session's ID
             "started_at": first.get("started_at"),
             "ended_at": last.get("ended_at"),
             "start_amount_kwh": first.get("start_amount_kwh"),
             "end_amount_kwh": last.get("end_amount_kwh"),
-            "session_energy_kwh": None,
+            "session_energy_kwh": total_energy,
             "meta": {
                 "plug_state": last.get("meta", {}).get("plug_state"),
                 "output_state": last.get("meta", {}).get("output_state"),
@@ -704,12 +713,6 @@ def api_sessions_merge(body: dict):
                 "merged_from": session_ids,
             }
         }
-        
-        # Calculate total energy
-        start_amt = merged.get("start_amount_kwh")
-        end_amt = merged.get("end_amount_kwh")
-        if start_amt is not None and end_amt is not None:
-            merged["session_energy_kwh"] = max(0.0, end_amt - start_amt)
         
         # Remove old sessions and add merged one
         sessions = [s for s in sessions if s.get("id") not in session_ids]
