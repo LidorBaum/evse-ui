@@ -231,13 +231,41 @@ function updateMergePreview() {
     return;
   }
   
-  btn.disabled = false;
+  // Check for gaps - all sessions sorted by time
+  const allSorted = [mergeMainSession, ...mergeNeighbors].sort((a, b) => 
+    new Date(a.started_at) - new Date(b.started_at)
+  );
+  
+  // Find indices of selected sessions
+  const selectedIndices = [];
+  allSorted.forEach((s, i) => {
+    if (mergeSelected.has(s.id)) selectedIndices.push(i);
+  });
+  
+  // Check if indices are consecutive (no gaps)
+  let hasGap = false;
+  for (let i = 1; i < selectedIndices.length; i++) {
+    if (selectedIndices[i] - selectedIndices[i-1] > 1) {
+      hasGap = true;
+      break;
+    }
+  }
+  
   preview.classList.remove('hidden');
   
-  // Calculate merged stats
-  const allToMerge = [mergeMainSession, ...mergeNeighbors].filter(s => mergeSelected.has(s.id));
-  allToMerge.sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+  if (hasGap) {
+    btn.disabled = true;
+    document.getElementById('mergePreviewDetails').innerHTML = `
+      <div class="text-red-500 font-medium">⚠️ Cannot merge with gaps!</div>
+      <div class="text-red-400 text-xs">Selected sessions must be consecutive. Deselect sessions in between or select them too.</div>
+    `;
+    return;
+  }
   
+  btn.disabled = false;
+  
+  // Calculate merged stats
+  const allToMerge = allSorted.filter(s => mergeSelected.has(s.id));
   const first = allToMerge[0];
   const last = allToMerge[allToMerge.length - 1];
   
