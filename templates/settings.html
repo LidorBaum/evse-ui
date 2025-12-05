@@ -225,7 +225,8 @@ async function saveSettings(){
   const usersRaw = document.getElementById('usersList').value;
   const users = usersRaw.split(',').map(u => u.trim()).filter(u => u.length > 0);
   const pricePerKwh = parseFloat(document.getElementById('pricePerKwh').value) || 0;
-  const clockDiscount = parseInt(document.getElementById('clockDiscount').value) || 20;
+  const clockDiscountVal = parseInt(document.getElementById('clockDiscount').value);
+  const clockDiscount = isNaN(clockDiscountVal) ? 20 : clockDiscountVal;
   const batteryCapacity = parseFloat(document.getElementById('batteryCapacity').value) || 64;
 
   try {
