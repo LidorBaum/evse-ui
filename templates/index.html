@@ -550,10 +550,11 @@ async function verifyAmpsCommand(expectedAmps, oldAmps, timeout = 8000){
   await load(); // Refresh state
   
   if (lastAmps === expectedAmps) {
-    return true; // Success
+    showToast(`✅ Amps changed to ${expectedAmps}A`, 'success');
+    return true;
   }
   
-  showToast(`⚠️ AMPS command may have failed - still at ${lastAmps}A`, 'warning');
+  showToast(`⚠️ Amps command may have failed - still at ${lastAmps}A`, 'warning');
   return false;
 }
 

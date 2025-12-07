@@ -253,10 +253,18 @@ def _verify_command():
         # Expect amps to match
         current_amps = latest_config.get("charge_amps")
         expected_amps = cmd.get("expected")
+        initial_amps = initial_state.get("amps")
         success = current_amps == expected_amps
+        
+        # Send Telegram for amps change (success or failure)
+        if success:
+            _send_telegram(f"✅ <b>Amps Changed</b>\n🔌 {initial_amps}A → {expected_amps}A")
+        else:
+            _send_telegram(f"⚠️ <b>Amps command failed</b>\n🔌 Tried to set {expected_amps}A but still at {current_amps}A\nCheck charger/BLE connection.")
+        return  # Already handled telegram for amps
     
     if not success:
-        # Send Telegram alert
+        # Send Telegram alert for start/stop commands
         cmd_name = cmd_type.upper()
         _send_telegram(f"⚠️ <b>Command may have failed</b>\n🔌 {cmd_name} command sent but state didn't change as expected.\nCheck charger/BLE connection.")
 
