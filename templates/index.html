@@ -215,12 +215,22 @@
       <p class="mt-2 text-sm text-gray-500 dark:text-gray-400" id="clockModeNote"></p>
     </div>
 
-    <!-- Amps Slider -->
+    <!-- Amps Buttons -->
     <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
       <div class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Max Amps: <span id="ampsVal">N/A</span></div>
-      <input id="amps" type="range" min="6" max="16" step="1" disabled
-         class="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed accent-emerald-500"
-         oninput="ampsVal.innerText=this.value+'A'" />
+      <div id="ampsButtons" class="grid grid-cols-6 sm:grid-cols-11 gap-2">
+        <button type="button" data-amps="6" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">6A</button>
+        <button type="button" data-amps="7" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">7A</button>
+        <button type="button" data-amps="8" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">8A</button>
+        <button type="button" data-amps="9" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">9A</button>
+        <button type="button" data-amps="10" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">10A</button>
+        <button type="button" data-amps="11" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">11A</button>
+        <button type="button" data-amps="12" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">12A</button>
+        <button type="button" data-amps="13" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">13A</button>
+        <button type="button" data-amps="14" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">14A</button>
+        <button type="button" data-amps="15" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">15A</button>
+        <button type="button" data-amps="16" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">16A</button>
+      </div>
     </div>
 
     <!-- Status and Telemetry Grid -->
@@ -276,9 +286,6 @@
   </div>
 
 <script>
-let isDragging = false;
-let debounceTimer = null;
-
 // optimistic lock
 let pendingAmps = null;
 let lockUntilTs = 0;
@@ -525,11 +532,12 @@ async function startWithUser(){
   await post('/api/start_for/' + user);
 }
 
-async function setAmps(){
-  const v = Number(document.getElementById('amps').value);
+async function setAmps(v){
   const oldAmps = lastAmps;
   pendingAmps = v;
   lockUntilTs = Date.now() + 4000;
+  document.getElementById('ampsVal').innerText = v + 'A';
+  updateAmpsButtonSelection(v);
   await post('/api/amps/' + v);
   setTimeout(load, 800);
   
@@ -740,8 +748,6 @@ function updateLastUpdateDisplay(){
 setInterval(updateLastUpdateDisplay, 1000);
 
 async function load(){
-  if (isDragging) return;
-
   const r = await fetch('/api/state');
   const data = await r.json();
 
@@ -766,11 +772,12 @@ async function load(){
 
   if (!lockActive || telemMatchesPending){
     if (telemMatchesPending) pendingAmps = null;
-    document.getElementById('amps').value = telemAmps ?? 16;
+    const displayAmps = telemAmps ?? 16;
     document.getElementById('ampsVal').innerText = telemAmps != null ? telemAmps + 'A' : 'N/A';
+    updateAmpsButtonSelection(displayAmps);
   } else {
-    document.getElementById('amps').value = pendingAmps;
     document.getElementById('ampsVal').innerText = pendingAmps + 'A';
+    updateAmpsButtonSelection(pendingAmps);
   }
 
   const wasCharging = isCharging;
@@ -785,8 +792,7 @@ async function load(){
 
   if (wasCharging !== isCharging || hadData !== hasData) {
     renderControlButtons();
-    const ampsSlider = document.getElementById('amps');
-    ampsSlider.disabled = !hasData;
+    setAmpsButtonsEnabled(hasData);
   }
 
   // Update charging animation (unless demo mode is active)
@@ -842,25 +848,32 @@ async function load(){
   document.getElementById('telemetry').innerHTML = t.join('');
 }
 
-const ampsEl = document.getElementById('amps');
-let ampsSent = false;  // Prevent double-send on touchend + mouseup
-
-ampsEl.addEventListener('touchstart', () => { isDragging = true; ampsSent = false; });
-ampsEl.addEventListener('mousedown',  () => { isDragging = true; ampsSent = false; });
-
-function dragEnd(){
-  if (ampsSent) return;  // Already sent
-  ampsSent = true;
-  isDragging = false;
-  clearTimeout(debounceTimer);
-  setAmps();
+// Amps buttons handling
+function updateAmpsButtonSelection(selectedAmps) {
+  document.querySelectorAll('#ampsButtons .amp-btn').forEach(btn => {
+    const btnAmps = Number(btn.dataset.amps);
+    if (btnAmps === selectedAmps) {
+      btn.classList.remove('border-gray-300', 'dark:border-gray-600', 'text-gray-700', 'dark:text-gray-300', 'bg-gray-100', 'dark:bg-gray-700');
+      btn.classList.add('border-emerald-500', 'bg-emerald-500', 'text-white');
+    } else {
+      btn.classList.remove('border-emerald-500', 'bg-emerald-500', 'text-white');
+      btn.classList.add('border-gray-300', 'dark:border-gray-600', 'text-gray-700', 'dark:text-gray-300', 'bg-gray-100', 'dark:bg-gray-700');
+    }
+  });
 }
 
-ampsEl.addEventListener('touchend', dragEnd);
-ampsEl.addEventListener('mouseup',  dragEnd);
+function setAmpsButtonsEnabled(enabled) {
+  document.querySelectorAll('#ampsButtons .amp-btn').forEach(btn => {
+    btn.disabled = !enabled;
+  });
+}
 
-ampsEl.addEventListener('input', (e) => {
-  document.getElementById('ampsVal').innerText = e.target.value + 'A';
+document.querySelectorAll('#ampsButtons .amp-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return;
+    const v = Number(btn.dataset.amps);
+    setAmps(v);
+  });
 });
 
 async function loadSettings(){
