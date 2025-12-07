@@ -209,7 +209,7 @@ _last_known_amps: int | None = None  # Track amps for change notifications
 
 # Command verification system
 _pending_command: dict | None = None  # {"type": "start"|"stop"|"amps", "expected": ..., "initial_state": ..., "sent_at": timestamp}
-_command_verify_timeout = 12  # seconds to wait before checking
+_command_verify_timeout = 5  # seconds to wait before checking
 
 
 def _get_current_energy():
