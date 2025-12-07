@@ -819,6 +819,7 @@ async function load(){
   const statusHtml = [];
   statusHtml.push(kv("Plug", ch.plug_state ?? '-'));
   statusHtml.push(kv("State", ch.output_state ?? '-', ch.output_state === 'Charging'));
+  statusHtml.push(kv("Max Amps", cfg.charge_amps != null ? cfg.charge_amps + 'A' : '-'));
   statusHtml.push(kv("Errors", ch.error_details ?? '-'));
   document.getElementById('statusText').innerHTML = statusHtml.join('');
 
