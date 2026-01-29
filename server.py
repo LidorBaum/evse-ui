@@ -68,21 +68,24 @@ SETTINGS_FILE = os.getenv("SETTINGS_FILE", "settings.json")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
-def _send_telegram(message: str):
+def _send_telegram(message: str, silent: bool = False):
     """Send a message via Telegram bot (non-blocking)."""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
-    
+
     def _send():
         try:
             import urllib.request
             import urllib.parse
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-            data = urllib.parse.urlencode({
+            data_dict = {
                 "chat_id": TELEGRAM_CHAT_ID,
                 "text": message,
                 "parse_mode": "HTML"
-            }).encode()
+            }
+            if silent:
+                data_dict["disable_notification"] = "true"
+            data = urllib.parse.urlencode(data_dict).encode()
             req = urllib.request.Request(url, data=data)
             urllib.request.urlopen(req, timeout=10)
         except Exception as e:
@@ -258,9 +261,9 @@ def _verify_command():
         
         # Send Telegram for amps change (success or failure)
         if success:
-            _send_telegram(f"✅ <b>Amps Changed</b>\n🔌 {initial_amps}A → {expected_amps}A")
+            _send_telegram(f"✅ <b>Amps Changed</b>\n🔌 {initial_amps}A → {expected_amps}A", silent=True)
         else:
-            _send_telegram(f"⚠️ <b>Amps command failed</b>\n🔌 Tried to set {expected_amps}A but still at {current_amps}A\nCheck charger/BLE connection.")
+            _send_telegram(f"⚠️ <b>Amps command failed</b>\n🔌 Tried to set {expected_amps}A but still at {current_amps}A\nCheck charger/BLE connection.", silent=True)
         return  # Already handled telegram for amps
     
     if not success:
@@ -530,7 +533,7 @@ def on_message(client, userdata, msg):
             if new_amps != _last_known_amps and _get_current_energy() > 0:
                 # Amps changed while charging - notify
                 direction = "⬆️" if new_amps > _last_known_amps else "⬇️"
-                _send_telegram(f"{direction} <b>Amps Changed</b>\n🔌 {_last_known_amps}A → {new_amps}A")
+                _send_telegram(f"{direction} <b>Amps Changed</b>\n🔌 {_last_known_amps}A → {new_amps}A", silent=True)
         
         _last_known_amps = new_amps
         latest_config = new_config
