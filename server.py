@@ -671,6 +671,24 @@ def api_session_neighbors(session_id: str):
         return {"ok": True, "session": target, "neighbors": neighbors}
 
 
+@app.delete("/api/session/{session_id}")
+def api_session_delete(session_id: str):
+    """Delete a completed session. Cannot delete the current (ongoing) session."""
+    global sessions
+
+    with _sessions_lock:
+        if current_session is not None and current_session.get("id") == session_id:
+            return {"ok": False, "error": "Cannot delete ongoing session"}
+
+        for i, s in enumerate(sessions):
+            if s.get("id") == session_id:
+                sessions.pop(i)
+                _save_sessions()
+                return {"ok": True}
+
+    return {"ok": False, "error": "Session not found"}
+
+
 @app.post("/api/sessions/merge")
 def api_sessions_merge(body: dict):
     """Merge multiple sessions into one."""
