@@ -345,6 +345,8 @@ let allSessions = [];
 let selectedUser = '';
 let mainChart = null;
 let currentChartView = 'cost';
+let displayedCount = 0;
+const PAGE_SIZE = 30;
 
 function fmtDate(isoStr){
   if (!isoStr) return '?';
@@ -813,8 +815,37 @@ function populateUserFilter() {
     sortedUsers.map(u => `<option value="${u}">${u}</option>`).join('');
 }
 
+function renderSessionsList(sessions) {
+  const container = document.getElementById('sessionsList');
+  
+  if (!sessions.length) {
+    container.innerHTML = '<div class="text-gray-500 dark:text-gray-400">No sessions for this user.</div>';
+    return;
+  }
+  
+  const toShow = sessions.slice(0, displayedCount);
+  const hasMore = sessions.length > displayedCount;
+  
+  let html = toShow.map(fmtSession).join('');
+  
+  if (hasMore) {
+    const remaining = sessions.length - displayedCount;
+    html += `<button onclick="loadMore()" class="w-full py-3 mt-4 rounded-lg font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition">
+      Load More (showing ${displayedCount} of ${sessions.length})
+    </button>`;
+  }
+  
+  container.innerHTML = html;
+}
+
+function loadMore() {
+  displayedCount += PAGE_SIZE;
+  renderSessionsList(getFilteredSessions());
+}
+
 function applyFilter() {
   selectedUser = document.getElementById('userFilter').value;
+  displayedCount = PAGE_SIZE;
   const filtered = getFilteredSessions();
   
   document.getElementById('stats').innerHTML = '<div class="text-center py-4"><svg class="w-6 h-6 mx-auto animate-spin text-emerald-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>';
@@ -824,12 +855,7 @@ function applyFilter() {
     renderStats(filtered);
     renderMonthlyBreakdown(filtered);
     renderChart(filtered);
-    
-    if (!filtered.length) {
-      document.getElementById('sessionsList').innerHTML = '<div class="text-gray-500 dark:text-gray-400">No sessions for this user.</div>';
-    } else {
-      document.getElementById('sessionsList').innerHTML = filtered.map(fmtSession).join('');
-    }
+    renderSessionsList(filtered);
   }, 10);
 }
 

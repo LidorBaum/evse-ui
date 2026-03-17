@@ -59,7 +59,7 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 # ---- Session logging config ----
 SESSIONS_FILE = os.getenv("SESSIONS_FILE", "sessions.json")
-MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "500"))
+MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "2000"))
 
 # ---- Settings config ----
 SETTINGS_FILE = os.getenv("SETTINGS_FILE", "settings.json")
