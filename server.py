@@ -1,7 +1,9 @@
 import hashlib
+import html
 import json
 import os
 import secrets
+import socket
 import subprocess
 import threading
 import time
@@ -169,6 +171,7 @@ def _load_settings() -> dict:
         "price_per_kwh": 0.64,
         "clock_discount_percent": 20,  # 20% off during clock hours
         "battery_capacity_kwh": 64.0,  # MG4 default
+        "telegram_notify_service_up": True,
     }
     needs_save = False
 
@@ -204,6 +207,21 @@ def _save_settings(settings: dict):
 app_settings: dict = _load_settings()
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+async def _notify_telegram_service_up():
+    if not app_settings.get("telegram_notify_service_up", True):
+        return
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+    host = html.escape(socket.gethostname())
+    _send_telegram(
+        f"🟢 <b>EVSE-UI is up</b>\n"
+        f"Host: <code>{host}</code>\n"
+        f"Service started (restart or reboot)."
+    )
+
 
 latest_charge: dict = {}
 latest_config: dict = {}
@@ -932,6 +950,8 @@ def api_post_settings(new_settings: dict):
             app_settings["clock_discount_percent"] = int(new_settings["clock_discount_percent"])
         except (TypeError, ValueError):
             pass
+    if "telegram_notify_service_up" in new_settings:
+        app_settings["telegram_notify_service_up"] = bool(new_settings["telegram_notify_service_up"])
     _save_settings(app_settings)
     return {"ok": True, "settings": app_settings}
 

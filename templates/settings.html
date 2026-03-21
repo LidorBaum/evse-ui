@@ -115,6 +115,13 @@
     <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
       <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Telegram Notifications</h2>
       <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Get notified when charging starts, ends, or errors occur</p>
+      <label class="mt-4 flex items-start gap-3 cursor-pointer select-none">
+        <input type="checkbox" id="telegramNotifyServiceUp" class="mt-1 rounded border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-emerald-500" />
+        <span>
+          <span class="block text-sm font-medium text-gray-900 dark:text-white">Notify when service starts</span>
+          <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">Send a Telegram message after each restart or reboot (so you know the Pi is back online)</span>
+        </span>
+      </label>
       <button onclick="testTelegram(this)" class="mt-3 w-full py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer">Send Test Message 📬</button>
       <p class="text-sm mt-2" id="telegramNote"></p>
     </div>
@@ -155,6 +162,7 @@ async function loadSettings(){
     document.getElementById('pricePerKwh').value = s.price_per_kwh;
     document.getElementById('clockDiscount').value = s.clock_discount_percent ?? 20;
     document.getElementById('batteryCapacity').value = s.battery_capacity_kwh || 64;
+    document.getElementById('telegramNotifyServiceUp').checked = s.telegram_notify_service_up !== false;
   } catch(e) {}
 }
 
@@ -240,7 +248,8 @@ async function saveSettings(){
         users: users,
         price_per_kwh: pricePerKwh,
         clock_discount_percent: clockDiscount,
-        battery_capacity_kwh: batteryCapacity
+        battery_capacity_kwh: batteryCapacity,
+        telegram_notify_service_up: document.getElementById('telegramNotifyServiceUp').checked
       })
     });
     if (r.ok) {
