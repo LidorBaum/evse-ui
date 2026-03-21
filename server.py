@@ -1033,6 +1033,179 @@ def _send_telegram_file(file_path: str, caption: str = "", silent: bool = True):
         return False, str(e)
 
 
+def _build_status_message() -> str:
+    """Build a rich status message from current charger state."""
+    lines = []
+
+    # Availability
+    status_emoji = "🟢" if availability == "online" else "🔴" if availability == "offline" else "⚪"
+    lines.append(f"{status_emoji} <b>Charger: {availability.upper()}</b>")
+
+    # Staleness check
+    if last_mqtt_update > 0:
+        age = time.time() - last_mqtt_update
+        if age > 120:
+            mins = int(age // 60)
+            lines.append(f"⏱ Last update: {mins}m ago")
+
+    # Plug / output / error state
+    plug = latest_charge.get("plug_state", "unknown")
+    output = latest_charge.get("output_state", "unknown")
+    error = latest_charge.get("error_details", "")
+    lines.append(f"🔌 Plug: {plug} | Output: {output}")
+
+    if error and "no error" not in error.lower():
+        lines.append(f"⚠️ Error: {error}")
+
+    # Amps
+    amps = latest_config.get("charge_amps")
+    if amps is not None:
+        lines.append(f"⚡ Amps: {amps}A")
+
+    # Current session (if charging)
+    if current_session is not None:
+        lines.append("")
+        lines.append("🔋 <b>Currently Charging</b>")
+        user = (current_session.get("meta") or {}).get("user", "Unknown")
+        lines.append(f"👤 User: {user}")
+
+        started = current_session.get("started_at", "")
+        if started:
+            try:
+                start_dt = datetime.fromisoformat(started.replace("Z", "+00:00"))
+                duration_sec = (datetime.utcnow() - start_dt.replace(tzinfo=None)).total_seconds()
+                hours = int(duration_sec // 3600)
+                mins = int((duration_sec % 3600) // 60)
+                lines.append(f"⏱ Duration: {hours}h {mins}m")
+            except Exception:
+                pass
+
+        start_amt = current_session.get("start_amount_kwh")
+        end_amt = current_session.get("end_amount_kwh")
+        if start_amt is not None and end_amt is not None:
+            energy = max(0.0, float(end_amt) - float(start_amt))
+            battery_cap = app_settings.get("battery_capacity_kwh", 64.0)
+            battery_pct = round((energy / battery_cap) * 100) if battery_cap > 0 else 0
+            price = app_settings.get("price_per_kwh", 0.55)
+            cost_est = energy * price
+            lines.append(f"⚡ Energy: {energy:.2f} kWh (+{battery_pct}%)")
+            lines.append(f"💰 Cost est: ₪{cost_est:.2f}")
+    else:
+        lines.append("")
+        lines.append("💤 <b>Not charging</b>")
+
+    # Monthly stats
+    now = datetime.utcnow()
+    current_month = f"{now.year}-{now.month:02d}"
+    m_kwh = 0.0
+    m_cost = 0.0
+    m_sessions = 0
+
+    with _sessions_lock:
+        for s in sessions:
+            started_at = s.get("started_at", "")
+            if started_at[:7] == current_month:
+                energy = _get_session_energy(s)
+                m_kwh += energy
+                m_cost += _calc_session_cost(energy, started_at, s.get("ended_at") or _utc_iso())
+                m_sessions += 1
+
+    lines.append("")
+    month_name = now.strftime("%B %Y")
+    lines.append(f"📊 <b>{month_name}</b>")
+    lines.append(f"   Sessions: {m_sessions}")
+    lines.append(f"   Energy: {m_kwh:.1f} kWh")
+    lines.append(f"   Cost: ₪{m_cost:.2f}")
+
+    return "\n".join(lines)
+
+
+def _handle_telegram_command(text: str) -> str | None:
+    """Parse a Telegram message and return a response, or None to ignore."""
+    cmd = text.strip().lower()
+
+    # Strip @botname suffix (group chats send "/status@MyBot")
+    if "@" in cmd:
+        cmd = cmd.split("@")[0]
+
+    if cmd in ("/status", "status"):
+        return _build_status_message()
+
+    if cmd in ("/help", "help"):
+        return (
+            "📖 <b>Available Commands</b>\n"
+            "\n"
+            "<b>status</b> - Charger state, session info, monthly stats\n"
+            "<b>help</b> - Show this message"
+        )
+
+    return None
+
+
+def _telegram_poll_loop():
+    """Long-poll Telegram getUpdates API and dispatch commands."""
+    import urllib.request
+    import urllib.parse
+
+    offset = 0
+    base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+    backoff = 1
+    max_backoff = 60
+
+    while True:
+        try:
+            params = urllib.parse.urlencode({
+                "offset": offset,
+                "timeout": 30,
+                "allowed_updates": '["message"]',
+            })
+            url = f"{base_url}?{params}"
+            req = urllib.request.Request(url)
+            resp = urllib.request.urlopen(req, timeout=40)
+            data = json.loads(resp.read().decode())
+
+            if not data.get("ok"):
+                print(f"Telegram getUpdates error: {data}")
+                time.sleep(backoff)
+                backoff = min(backoff * 2, max_backoff)
+                continue
+
+            backoff = 1
+
+            for update in data.get("result", []):
+                update_id = update.get("update_id", 0)
+                offset = max(offset, update_id + 1)
+
+                message = update.get("message")
+                if not message:
+                    continue
+
+                chat_id = str(message.get("chat", {}).get("id", ""))
+                if chat_id != TELEGRAM_CHAT_ID:
+                    continue
+
+                text = message.get("text", "")
+                if not text:
+                    continue
+
+                try:
+                    response = _handle_telegram_command(text)
+                    if response:
+                        _send_telegram(response, silent=True)
+                except Exception as e:
+                    print(f"Telegram command error: {e}")
+
+        except Exception as e:
+            print(f"Telegram poll error: {e}")
+            time.sleep(backoff)
+            backoff = min(backoff * 2, max_backoff)
+
+
+# Start Telegram polling thread for 2-way communication
+if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+    threading.Thread(target=_telegram_poll_loop, daemon=True, name="telegram-poll").start()
+
+
 @app.post("/api/telegram/send-sessions")
 def api_telegram_send_sessions():
     """Send sessions.json via Telegram."""
