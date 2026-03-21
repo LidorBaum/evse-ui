@@ -1152,6 +1152,8 @@ def _telegram_poll_loop():
     backoff = 1
     max_backoff = 60
 
+    print(f"[Telegram] Polling started (chat_id={TELEGRAM_CHAT_ID})")
+
     while True:
         try:
             params = urllib.parse.urlencode({
@@ -1165,14 +1167,18 @@ def _telegram_poll_loop():
             data = json.loads(resp.read().decode())
 
             if not data.get("ok"):
-                print(f"Telegram getUpdates error: {data}")
+                print(f"[Telegram] getUpdates error: {data}")
                 time.sleep(backoff)
                 backoff = min(backoff * 2, max_backoff)
                 continue
 
             backoff = 1
 
-            for update in data.get("result", []):
+            results = data.get("result", [])
+            if results:
+                print(f"[Telegram] Got {len(results)} update(s)")
+
+            for update in results:
                 update_id = update.get("update_id", 0)
                 offset = max(offset, update_id + 1)
 
@@ -1181,19 +1187,26 @@ def _telegram_poll_loop():
                     continue
 
                 chat_id = str(message.get("chat", {}).get("id", ""))
+                text = message.get("text", "")
+                sender = message.get("from", {}).get("first_name", "?")
+                print(f"[Telegram] Message from {sender} in chat {chat_id}: {text!r}")
+
                 if chat_id != TELEGRAM_CHAT_ID:
+                    print(f"[Telegram] Ignored: chat_id {chat_id} != {TELEGRAM_CHAT_ID}")
                     continue
 
-                text = message.get("text", "")
                 if not text:
                     continue
 
                 try:
                     response = _handle_telegram_command(text)
                     if response:
+                        print(f"[Telegram] Replying to command: {text!r}")
                         _send_telegram(response, silent=True)
+                    else:
+                        print(f"[Telegram] No handler for: {text!r}")
                 except Exception as e:
-                    print(f"Telegram command error: {e}")
+                    print(f"[Telegram] Command error: {e}")
 
         except Exception as e:
             print(f"Telegram poll error: {e}")
