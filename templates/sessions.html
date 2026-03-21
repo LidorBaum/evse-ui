@@ -120,7 +120,54 @@
     </div>
   </div>
 
+  <!-- User Switch Modal -->
+  <div id="userModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-sm mx-4 shadow-xl">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Switch User</h3>
+      <input type="hidden" id="userSessionId" />
+      <div id="userList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+      <div class="flex gap-3 mt-4">
+        <button onclick="closeUserModal()" class="flex-1 py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
+      </div>
+    </div>
+  </div>
+
 <script>
+let availableUsers = [];
+
+// User Modal functions
+function openUserModal(sessionId, currentUser) {
+  document.getElementById('userSessionId').value = sessionId;
+  const container = document.getElementById('userList');
+  container.innerHTML = availableUsers.map(u => {
+    const isSelected = u === currentUser;
+    return `<button onclick="saveUser('${u.replace(/'/g, "\\'")}')" class="w-full text-left px-4 py-2.5 rounded-lg font-medium transition flex items-center gap-2 ${isSelected ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700' : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 border border-transparent'}">
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+      ${u}${isSelected ? ' <span class="text-xs ml-auto">(current)</span>' : ''}
+    </button>`;
+  }).join('');
+  document.getElementById('userModal').classList.remove('hidden');
+}
+
+function closeUserModal() {
+  document.getElementById('userModal').classList.add('hidden');
+}
+
+async function saveUser(user) {
+  const sessionId = document.getElementById('userSessionId').value;
+  try {
+    const r = await fetch('/api/session/' + sessionId + '/user', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ user })
+    });
+    if (r.ok) {
+      closeUserModal();
+      loadSessions();
+    }
+  } catch(e) {}
+}
+
 // Note Modal functions
 function openNoteModal(sessionId, currentNote) {
   document.getElementById('noteSessionId').value = sessionId;
@@ -341,11 +388,13 @@ const isDarkMode = (function() {
 let pricePerKwh = 0;
 let clockSettings = { clock_start: '23:00', clock_end: '07:00' };
 let clockDiscountPercent = 20;
-let allSessions = [];
+let loadedSessions = [];  // Only the sessions loaded so far (paginated)
 let selectedUser = '';
 let mainChart = null;
 let currentChartView = 'cost';
-let displayedCount = 0;
+let currentPage = 0;
+let hasMore = false;
+let totalSessions = 0;
 const PAGE_SIZE = 30;
 
 function fmtDate(isoStr){
@@ -477,34 +526,20 @@ function getMonthShortName(monthKey) {
   return d.toLocaleString('en-US', { month: 'short' });
 }
 
-// Chart functions
-function getChartData(sessions) {
-  const months = {};
-  
-  sessions.forEach(s => {
-    const monthKey = getMonthKey(s.started_at);
-    if (!monthKey) return;
-    
-    if (!months[monthKey]) {
-      months[monthKey] = { kwh: 0, cost: 0, count: 0 };
-    }
-    
-    const energy = getSessionEnergy(s);
-    const cost = calcSessionCost(energy, s.started_at, s.ended_at);
-    
-    months[monthKey].kwh += energy;
-    months[monthKey].cost += cost;
-    months[monthKey].count++;
-  });
-  
-  // Sort by month and get last 12 months
-  const sortedKeys = Object.keys(months).sort().slice(-12);
-  
-  return {
-    labels: sortedKeys.map(k => getMonthShortName(k)),
-    cost: sortedKeys.map(k => months[k].cost),
-    energy: sortedKeys.map(k => months[k].kwh),
-    sessions: sortedKeys.map(k => months[k].count)
+// Chart data is now provided by the server summary
+let cachedChartData = null;
+
+function getChartData() {
+  if (!cachedChartData) return { labels: [], cost: [], energy: [], sessions: [] };
+  return cachedChartData;
+}
+
+function buildChartData(chartMonths) {
+  cachedChartData = {
+    labels: chartMonths.map(m => getMonthShortName(m.month)),
+    cost: chartMonths.map(m => m.cost),
+    energy: chartMonths.map(m => m.kwh),
+    sessions: chartMonths.map(m => m.count)
   };
 }
 
@@ -521,12 +556,12 @@ function setChartView(view) {
     }
   });
   
-  renderChart(getFilteredSessions());
+  renderChart();
 }
 
-function renderChart(sessions) {
+function renderChart() {
   const ctx = document.getElementById('mainChart').getContext('2d');
-  const data = getChartData(sessions);
+  const data = getChartData();
   const isDark = document.documentElement.classList.contains('dark');
   
   const configs = {
@@ -624,105 +659,51 @@ function renderChart(sessions) {
   });
 }
 
-function renderStats(sessions) {
-  const now = new Date();
-  const currentMonthKey = getMonthKey(now.toISOString());
-  
-  let totalKwh = 0;
-  let totalCost = 0;
-  let monthKwh = 0;
-  let monthCost = 0;
-  let monthSessions = 0;
-  let totalDuration = 0;
-  let biggestSession = 0;
-  let biggestSessionUser = '';
-
-  sessions.forEach(s => {
-    const energy = getSessionEnergy(s);
-    const cost = calcSessionCost(energy, s.started_at, s.ended_at);
-    const duration = getSessionDurationMins(s);
-    const monthKey = getMonthKey(s.started_at);
-
-    totalKwh += energy;
-    totalCost += cost;
-    totalDuration += duration;
-    if (energy > biggestSession) {
-      biggestSession = energy;
-      biggestSessionUser = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
-    }
-
-    if (monthKey === currentMonthKey) {
-      monthKwh += energy;
-      monthCost += cost;
-      monthSessions++;
-    }
-  });
-
+function renderStats(summary) {
   document.getElementById('stats').innerHTML = `
     <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
       <div class="text-center p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl">
-        <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₪${monthCost.toFixed(0)}</div>
+        <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₪${Math.round(summary.month_cost)}</div>
         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">This Month</div>
       </div>
       <div class="text-center p-4 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl">
-        <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₪${totalCost.toFixed(0)}</div>
+        <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₪${Math.round(summary.total_cost)}</div>
         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">All Time</div>
       </div>
       <div class="text-center p-4 bg-gray-100 dark:bg-gray-700 rounded-xl">
-        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${monthKwh.toFixed(0)}</div>
+        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${Math.round(summary.month_kwh)}</div>
         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">kWh This Month</div>
       </div>
       <div class="text-center p-4 bg-gray-100 dark:bg-gray-700 rounded-xl">
-        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${totalKwh.toFixed(0)}</div>
+        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${Math.round(summary.total_kwh)}</div>
         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">kWh All Time</div>
       </div>
       <div class="text-center p-4 bg-gray-100 dark:bg-gray-700 rounded-xl">
-        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${sessions.length}</div>
+        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${summary.total_sessions}</div>
         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Total Sessions</div>
       </div>
       <div class="text-center p-4 bg-gray-100 dark:bg-gray-700 rounded-xl">
-        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${monthSessions}</div>
+        <div class="text-2xl font-bold text-gray-700 dark:text-gray-200">${summary.month_sessions}</div>
         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Sessions This Month</div>
       </div>
     </div>
     <div class="text-center p-3 bg-amber-50 dark:bg-amber-900/30 rounded-xl">
-      🏆 <span class="font-semibold text-gray-900 dark:text-white">Biggest charge:</span> <span class="text-gray-700 dark:text-gray-300">${biggestSession.toFixed(1)} kWh by ${biggestSessionUser}</span>
+      🏆 <span class="font-semibold text-gray-900 dark:text-white">Biggest charge:</span> <span class="text-gray-700 dark:text-gray-300">${summary.biggest_kwh.toFixed(1)} kWh by ${summary.biggest_user}</span>
     </div>
   `;
 }
 
-function renderMonthlyBreakdown(sessions) {
-  const months = {};
-
-  sessions.forEach(s => {
-    const monthKey = getMonthKey(s.started_at);
-    if (!monthKey) return;
-
-    if (!months[monthKey]) {
-      months[monthKey] = { kwh: 0, cost: 0, count: 0 };
-    }
-
-    const energy = getSessionEnergy(s);
-    const cost = calcSessionCost(energy, s.started_at, s.ended_at);
-
-    months[monthKey].kwh += energy;
-    months[monthKey].cost += cost;
-    months[monthKey].count++;
-  });
-
-  const sortedMonths = Object.keys(months).sort().reverse();
-
-  const html = sortedMonths.map(key => {
-    const m = months[key];
+function renderMonthlyBreakdown(monthlyList) {
+  const html = monthlyList.map(m => {
     return `<div class="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
       <div>
-        <span class="font-semibold text-gray-900 dark:text-white">${getMonthName(key)}</span>
+        <span class="font-semibold text-gray-900 dark:text-white">${getMonthName(m.month)}</span>
         <span class="text-sm text-gray-500 dark:text-gray-400 ml-2">(${m.count} sessions)</span>
       </div>
       <div class="text-right">
-        <span class="font-semibold text-gray-900 dark:text-white">${m.kwh.toFixed(0)} kWh</span>
+        <span class="font-semibold text-gray-900 dark:text-white">${Math.round(m.kwh)} kWh</span>
         <span class="text-gray-500 dark:text-gray-400 mx-1">·</span>
-        <span class="font-semibold text-emerald-600 dark:text-emerald-400">₪${m.cost.toFixed(0)}</span>
+        <span class="font-semibold text-emerald-600 dark:text-emerald-400">₪${Math.round(m.cost)}</span>
       </div>
     </div>`;
   }).join('');
@@ -769,6 +750,9 @@ function fmtSession(s){
       </div>
       <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">${start} → ${end}</div>
     </div>
+    <button onclick="openUserModal('${s.id}', '${user.replace(/'/g, "\\'")}')" class="text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 px-2 transition" title="Switch user">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+    </button>
     ${!ongoing ? `<button onclick="openMergeModal('${s.id}')" class="text-gray-400 dark:text-gray-500 hover:text-purple-500 dark:hover:text-purple-400 px-2 transition" title="Merge with neighbors">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
     </button>` : ''}
@@ -790,93 +774,133 @@ async function loadSettings(){
     clockDiscountPercent = s.clock_discount_percent ?? 20;
     clockSettings.clock_start = s.clock_start || '23:00';
     clockSettings.clock_end = s.clock_end || '07:00';
+    availableUsers = s.users || ['User'];
   } catch(e) {}
 }
 
-function getFilteredSessions() {
-  if (!selectedUser) return allSessions;
-  return allSessions.filter(s => {
-    const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
-    return user === selectedUser;
-  });
-}
-
-function populateUserFilter() {
-  const users = new Set();
-  allSessions.forEach(s => {
-    const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
-    users.add(user);
-  });
-  
+function populateUserFilter(users) {
   const select = document.getElementById('userFilter');
-  const sortedUsers = Array.from(users).sort();
-  
-  select.innerHTML = '<option value="">All Users</option>' + 
-    sortedUsers.map(u => `<option value="${u}">${u}</option>`).join('');
+  select.innerHTML = '<option value="">All Users</option>' +
+    users.map(u => `<option value="${u}"${u === selectedUser ? ' selected' : ''}>${u}</option>`).join('');
 }
 
-function renderSessionsList(sessions) {
+function renderSessionsList() {
   const container = document.getElementById('sessionsList');
-  
-  if (!sessions.length) {
+
+  if (!loadedSessions.length) {
     container.innerHTML = '<div class="text-gray-500 dark:text-gray-400">No sessions for this user.</div>';
     return;
   }
-  
-  const toShow = sessions.slice(0, displayedCount);
-  const hasMore = sessions.length > displayedCount;
-  
-  let html = toShow.map(fmtSession).join('');
-  
+
+  let html = loadedSessions.map(fmtSession).join('');
+
   if (hasMore) {
-    const remaining = sessions.length - displayedCount;
-    html += `<button onclick="loadMore()" class="w-full py-3 mt-4 rounded-lg font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition">
-      Load More (showing ${displayedCount} of ${sessions.length})
+    html += `<button onclick="loadMore()" id="loadMoreBtn" class="w-full py-3 mt-4 rounded-lg font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition">
+      Load More (showing ${loadedSessions.length} of ${totalSessions})
     </button>`;
   }
-  
+
   container.innerHTML = html;
 }
 
-function loadMore() {
-  displayedCount += PAGE_SIZE;
-  renderSessionsList(getFilteredSessions());
+async function loadMore() {
+  const btn = document.getElementById('loadMoreBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+  }
+
+  currentPage++;
+  const userParam = selectedUser ? '&user=' + encodeURIComponent(selectedUser) : '';
+  try {
+    const r = await fetch('/api/sessions?page=' + currentPage + '&page_size=' + PAGE_SIZE + userParam);
+    if (!r.ok) return;
+    const data = await r.json();
+    loadedSessions = loadedSessions.concat(data.sessions || []);
+    hasMore = data.has_more;
+    totalSessions = data.total;
+    renderSessionsList();
+  } catch(e) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Retry';
+    }
+  }
 }
 
-function applyFilter() {
+async function applyFilter() {
   selectedUser = document.getElementById('userFilter').value;
-  displayedCount = PAGE_SIZE;
-  const filtered = getFilteredSessions();
-  
-  document.getElementById('stats').innerHTML = '<div class="text-center py-4"><svg class="w-6 h-6 mx-auto animate-spin text-emerald-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>';
-  document.getElementById('sessionsList').innerHTML = '<div class="text-center py-4"><svg class="w-6 h-6 mx-auto animate-spin text-emerald-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>';
-  
-  setTimeout(() => {
-    renderStats(filtered);
-    renderMonthlyBreakdown(filtered);
-    renderChart(filtered);
-    renderSessionsList(filtered);
-  }, 10);
+  currentPage = 1;
+  loadedSessions = [];
+  hasMore = false;
+
+  const spinner = '<div class="text-center py-4"><svg class="w-6 h-6 mx-auto animate-spin text-emerald-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>';
+  document.getElementById('stats').innerHTML = spinner;
+  document.getElementById('sessionsList').innerHTML = spinner;
+
+  const userParam = selectedUser ? '?user=' + encodeURIComponent(selectedUser) : '';
+
+  try {
+    // Fetch summary and first page in parallel
+    const [summaryRes, sessionsRes] = await Promise.all([
+      fetch('/api/sessions/summary' + userParam),
+      fetch('/api/sessions?page=1&page_size=' + PAGE_SIZE + (selectedUser ? '&user=' + encodeURIComponent(selectedUser) : ''))
+    ]);
+
+    if (!summaryRes.ok || !sessionsRes.ok) return;
+
+    const summary = await summaryRes.json();
+    const sessionsData = await sessionsRes.json();
+
+    loadedSessions = sessionsData.sessions || [];
+    hasMore = sessionsData.has_more;
+    totalSessions = sessionsData.total;
+
+    // Update stats, charts, monthly from summary
+    renderStats(summary);
+    buildChartData(summary.chart_months || []);
+    renderChart();
+    renderMonthlyBreakdown(summary.monthly || []);
+    populateUserFilter(summary.users || []);
+    renderSessionsList();
+  } catch(e) {}
 }
 
 async function loadSessions(){
   try {
-    const r = await fetch('/api/sessions');
-    if (!r.ok) return;
-    const data = await r.json();
-    allSessions = data.sessions || [];
-    
+    const userParam = selectedUser ? '?user=' + encodeURIComponent(selectedUser) : '';
+
+    // Fetch summary and first page in parallel
+    const [summaryRes, sessionsRes] = await Promise.all([
+      fetch('/api/sessions/summary' + userParam),
+      fetch('/api/sessions?page=1&page_size=' + PAGE_SIZE + (selectedUser ? '&user=' + encodeURIComponent(selectedUser) : ''))
+    ]);
+
+    if (!summaryRes.ok || !sessionsRes.ok) return;
+
+    const summary = await summaryRes.json();
+    const sessionsData = await sessionsRes.json();
+
+    currentPage = 1;
+    loadedSessions = sessionsData.sessions || [];
+    hasMore = sessionsData.has_more;
+    totalSessions = sessionsData.total;
+
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('contentArea').style.display = 'block';
-    
-    if (!allSessions.length) {
+
+    if (summary.total_sessions === 0) {
       document.getElementById('stats').innerHTML = '<div class="text-gray-500 dark:text-gray-400">No sessions yet.</div>';
       document.getElementById('sessionsList').innerHTML = '<div class="text-gray-500 dark:text-gray-400">No sessions yet.</div>';
       return;
     }
 
-    populateUserFilter();
-    applyFilter();
+    renderStats(summary);
+    buildChartData(summary.chart_months || []);
+    renderChart();
+    renderMonthlyBreakdown(summary.monthly || []);
+    populateUserFilter(summary.users || []);
+    renderSessionsList();
   } catch(e) {
     document.getElementById('loadingState').innerHTML = '<div class="text-center text-red-500">❌ Failed to load sessions.</div>';
   }

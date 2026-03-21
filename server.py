@@ -564,13 +564,118 @@ def api_state():
 
 
 @app.get("/api/sessions")
-def api_sessions():
-    # Return newest first; include current in‑progress session if present
+def api_sessions(page: int = 1, page_size: int = 30, user: str = ""):
+    """Return paginated sessions, newest first."""
     with _sessions_lock:
         items = sessions[-MAX_SESSIONS:]
         if current_session is not None:
             items = items + [current_session]
-        return {"sessions": list(reversed(items))}
+        # Newest first
+        items = list(reversed(items))
+
+        # Optional user filter
+        if user:
+            items = [s for s in items if (s.get("meta") or {}).get("user", "Unknown") == user]
+
+        total = len(items)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_items = items[start:end]
+
+        return {
+            "sessions": page_items,
+            "total": total,
+            "page": page,
+            "has_more": end < total,
+        }
+
+
+def _get_session_energy(s: dict) -> float:
+    """Get energy for a session (shared helper)."""
+    e = s.get("session_energy_kwh")
+    if e is not None:
+        return float(e)
+    start_a = s.get("start_amount_kwh")
+    end_a = s.get("end_amount_kwh")
+    if start_a is not None and end_a is not None:
+        return max(0.0, float(end_a) - float(start_a))
+    return 0.0
+
+
+@app.get("/api/sessions/summary")
+def api_sessions_summary(user: str = ""):
+    """Return pre-computed stats for all sessions without sending full session data."""
+    with _sessions_lock:
+        items = sessions[-MAX_SESSIONS:]
+        if current_session is not None:
+            items = items + [current_session]
+
+        # Collect unique users
+        all_users = set()
+        for s in items:
+            all_users.add((s.get("meta") or {}).get("user", "Unknown"))
+
+        # Optional user filter
+        if user:
+            items = [s for s in items if (s.get("meta") or {}).get("user", "Unknown") == user]
+
+        now = datetime.utcnow()
+        current_month = f"{now.year}-{now.month:02d}"
+
+        total_kwh = 0.0
+        total_cost = 0.0
+        month_kwh = 0.0
+        month_cost = 0.0
+        month_sessions = 0
+        biggest_kwh = 0.0
+        biggest_user = ""
+        monthly = {}  # month_key -> {kwh, cost, count}
+
+        for s in items:
+            energy = _get_session_energy(s)
+            started_at = s.get("started_at", "")
+            ended_at = s.get("ended_at", "")
+            cost = _calc_session_cost(energy, started_at, ended_at or _utc_iso())
+
+            total_kwh += energy
+            total_cost += cost
+
+            if energy > biggest_kwh:
+                biggest_kwh = energy
+                biggest_user = (s.get("meta") or {}).get("user", "Unknown")
+
+            # Month key from started_at
+            month_key = started_at[:7] if len(started_at) >= 7 else None
+            if month_key:
+                if month_key not in monthly:
+                    monthly[month_key] = {"kwh": 0.0, "cost": 0.0, "count": 0}
+                monthly[month_key]["kwh"] += energy
+                monthly[month_key]["cost"] += cost
+                monthly[month_key]["count"] += 1
+
+                if month_key == current_month:
+                    month_kwh += energy
+                    month_cost += cost
+                    month_sessions += 1
+
+        # Sort monthly newest first
+        sorted_monthly = sorted(monthly.items(), key=lambda x: x[0], reverse=True)
+        monthly_list = [{"month": k, "kwh": v["kwh"], "cost": v["cost"], "count": v["count"]} for k, v in sorted_monthly]
+
+        return {
+            "total_sessions": len(items),
+            "total_kwh": round(total_kwh, 2),
+            "total_cost": round(total_cost, 2),
+            "month_kwh": round(month_kwh, 2),
+            "month_cost": round(month_cost, 2),
+            "month_sessions": month_sessions,
+            "biggest_kwh": round(biggest_kwh, 2),
+            "biggest_user": biggest_user,
+            "monthly": monthly_list,
+            "users": sorted(all_users),
+            # Chart data: last 12 months oldest first
+            "chart_months": [{"month": k, "kwh": v["kwh"], "cost": v["cost"], "count": v["count"]} for k, v in sorted(monthly.items())[-12:]]
+        }
 
 
 @app.post("/api/session/{session_id}/note")
@@ -596,6 +701,34 @@ def api_session_note(session_id: str, body: dict):
                 _save_sessions()
                 return {"ok": True}
     
+    return {"ok": False, "error": "Session not found"}
+
+
+@app.post("/api/session/{session_id}/user")
+def api_session_user(session_id: str, body: dict):
+    """Change the user assigned to a session."""
+    user = body.get("user", "").strip()
+    if not user:
+        return {"ok": False, "error": "User is required"}
+
+    with _sessions_lock:
+        # Check current session first
+        if current_session is not None and current_session.get("id") == session_id:
+            if "meta" not in current_session:
+                current_session["meta"] = {}
+            current_session["meta"]["user"] = user
+            _save_sessions()
+            return {"ok": True}
+
+        # Check completed sessions
+        for s in sessions:
+            if s.get("id") == session_id:
+                if "meta" not in s:
+                    s["meta"] = {}
+                s["meta"]["user"] = user
+                _save_sessions()
+                return {"ok": True}
+
     return {"ok": False, "error": "Session not found"}
 
 
