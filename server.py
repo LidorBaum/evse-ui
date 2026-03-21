@@ -1214,8 +1214,24 @@ def _telegram_poll_loop():
             backoff = min(backoff * 2, max_backoff)
 
 
+# Register bot commands with Telegram (makes them clickable in chat menu)
+def _register_telegram_commands():
+    try:
+        import urllib.request
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setMyCommands"
+        commands = json.dumps({"commands": [
+            {"command": "status", "description": "Charger state, session info, monthly stats"},
+            {"command": "help", "description": "Show available commands"},
+        ]}).encode()
+        req = urllib.request.Request(url, data=commands, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=10)
+        print("[Telegram] Bot commands registered")
+    except Exception as e:
+        print(f"[Telegram] Failed to register commands: {e}")
+
 # Start Telegram polling thread for 2-way communication
 if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+    _register_telegram_commands()
     threading.Thread(target=_telegram_poll_loop, daemon=True, name="telegram-poll").start()
 
 
