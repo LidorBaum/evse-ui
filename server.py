@@ -68,7 +68,7 @@ SETTINGS_FILE = os.getenv("SETTINGS_FILE", "settings.json")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
-def _send_telegram(message: str, silent: bool = False):
+def _send_telegram(message: str, silent: bool = False, reply_markup: dict | None = None):
     """Send a message via Telegram bot (non-blocking)."""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
@@ -76,21 +76,22 @@ def _send_telegram(message: str, silent: bool = False):
     def _send():
         try:
             import urllib.request
-            import urllib.parse
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
             data_dict = {
                 "chat_id": TELEGRAM_CHAT_ID,
                 "text": message,
-                "parse_mode": "HTML"
+                "parse_mode": "HTML",
             }
             if silent:
-                data_dict["disable_notification"] = "true"
-            data = urllib.parse.urlencode(data_dict).encode()
-            req = urllib.request.Request(url, data=data)
+                data_dict["disable_notification"] = True
+            if reply_markup:
+                data_dict["reply_markup"] = reply_markup
+            payload = json.dumps(data_dict).encode()
+            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
             urllib.request.urlopen(req, timeout=10)
         except Exception as e:
             print(f"Telegram error: {e}")
-    
+
     # Send in background thread to not block
     t = threading.Thread(target=_send, daemon=True)
     t.start()
@@ -1120,8 +1121,16 @@ def _build_status_message() -> str:
     return "\n".join(lines)
 
 
-def _handle_telegram_command(text: str) -> str | None:
-    """Parse a Telegram message and return a response, or None to ignore."""
+_TELEGRAM_MENU_MARKUP = {
+    "inline_keyboard": [
+        [{"text": "📊 Status", "callback_data": "status"}],
+        [{"text": "📖 Help", "callback_data": "help"}],
+    ]
+}
+
+
+def _handle_telegram_command(text: str):
+    """Parse a Telegram message and return (response, reply_markup) or None to ignore."""
     cmd = text.strip().lower()
 
     # Strip @botname suffix (group chats send "/status@MyBot")
@@ -1129,15 +1138,17 @@ def _handle_telegram_command(text: str) -> str | None:
         cmd = cmd.split("@")[0]
 
     if cmd in ("/status", "status"):
-        return _build_status_message()
+        return _build_status_message(), _TELEGRAM_MENU_MARKUP
 
     if cmd in ("/help", "help"):
         return (
             "📖 <b>Available Commands</b>\n"
             "\n"
-            "<b>status</b> - Charger state, session info, monthly stats\n"
-            "<b>help</b> - Show this message"
-        )
+            "<b>/status</b> - Charger state, session info, monthly stats\n"
+            "<b>/help</b> - Show this message\n"
+            "\n"
+            "Or just tap the buttons below 👇"
+        ), _TELEGRAM_MENU_MARKUP
 
     return None
 
@@ -1159,7 +1170,7 @@ def _telegram_poll_loop():
             params = urllib.parse.urlencode({
                 "offset": offset,
                 "timeout": 30,
-                "allowed_updates": '["message"]',
+                "allowed_updates": '["message","callback_query"]',
             })
             url = f"{base_url}?{params}"
             req = urllib.request.Request(url)
@@ -1182,6 +1193,33 @@ def _telegram_poll_loop():
                 update_id = update.get("update_id", 0)
                 offset = max(offset, update_id + 1)
 
+                # Handle inline button presses
+                callback = update.get("callback_query")
+                if callback:
+                    cb_chat_id = str(callback.get("message", {}).get("chat", {}).get("id", ""))
+                    cb_data = callback.get("data", "")
+                    cb_id = callback.get("id")
+                    print(f"[Telegram] Button pressed: {cb_data!r} in chat {cb_chat_id}")
+
+                    if cb_chat_id == TELEGRAM_CHAT_ID:
+                        try:
+                            result = _handle_telegram_command(cb_data)
+                            if result:
+                                response, markup = result
+                                _send_telegram(response, silent=True, reply_markup=markup)
+                        except Exception as e:
+                            print(f"[Telegram] Callback error: {e}")
+
+                    # Answer callback to remove "loading" spinner on button
+                    try:
+                        answer_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
+                        answer_data = json.dumps({"callback_query_id": cb_id}).encode()
+                        answer_req = urllib.request.Request(answer_url, data=answer_data, headers={"Content-Type": "application/json"})
+                        urllib.request.urlopen(answer_req, timeout=5)
+                    except Exception:
+                        pass
+                    continue
+
                 message = update.get("message")
                 if not message:
                     continue
@@ -1199,10 +1237,11 @@ def _telegram_poll_loop():
                     continue
 
                 try:
-                    response = _handle_telegram_command(text)
-                    if response:
+                    result = _handle_telegram_command(text)
+                    if result:
+                        response, markup = result
                         print(f"[Telegram] Replying to command: {text!r}")
-                        _send_telegram(response, silent=True)
+                        _send_telegram(response, silent=True, reply_markup=markup)
                     else:
                         print(f"[Telegram] No handler for: {text!r}")
                 except Exception as e:
