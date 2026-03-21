@@ -553,6 +553,12 @@ def publish(payload: str):
     mqttc.publish(CMD_TOPIC, payload)
 
 
+@app.get("/health")
+def health():
+    """Lightweight probe for local watchdogs (no auth)."""
+    return {"ok": True}
+
+
 @app.get("/api/state")
 def api_state():
     return {

@@ -501,6 +501,81 @@ sudo systemctl status evse-ui --no-pager
 
 You should see `active (running)` in green. ✅
 
+### Step 6b: Health watchdog (optional auto-reboot)
+
+If the Pi sometimes freezes or `evse-ui` stops responding (web UI and Telegram both dead), you can install a **root cron** job that probes `http://127.0.0.1:PORT/health` every **10 minutes**. On each run it tries up to **3** times with **10 seconds** between failures. After **3 failed runs in a row** (about 30 minutes of downtime), it runs **`shutdown -r now`**. During the first **10 minutes after boot** it never counts failures toward a reboot (grace period).
+
+> **Note:** This only helps when Linux and `cron` still run. A full kernel lockup needs the [Raspberry Pi hardware watchdog](https://www.raspberrypi.com/documentation/computers/config_txt.html#what-is-the-onboard-watchdog-timer) instead.
+
+**1. Update the app on the Pi** (so `GET /health` exists in `server.py`), then restart the service:
+
+```bash
+cd ~/evse-ui
+git pull
+sudo systemctl restart evse-ui
+```
+
+**2. Install the script** (adjust the path if your install directory is not `~/evse-ui`):
+
+```bash
+sudo cp ~/evse-ui/scripts/evse-ui-watchdog.sh /usr/local/bin/evse-ui-watchdog.sh
+sudo chmod +x /usr/local/bin/evse-ui-watchdog.sh
+```
+
+**3. Quick manual test** (should print `{"ok":true}`):
+
+```bash
+curl -sS "http://127.0.0.1:8080/health"
+```
+
+If you use a different port in `evse-ui.service`, set `EVSE_UI_PORT` in the cron line (see below).
+
+**4. Cron as root** (required for reboot):
+
+```bash
+sudo crontab -e
+```
+
+Add one line (change `8080` if your service uses another port):
+
+```cron
+*/10 * * * * /usr/local/bin/evse-ui-watchdog.sh
+```
+
+Or with an explicit port:
+
+```cron
+*/10 * * * * EVSE_UI_PORT=8080 /usr/local/bin/evse-ui-watchdog.sh
+```
+
+**5. Logs**
+
+Messages go to the system log with tag `evse-ui-watchdog`.
+
+```bash
+# Recent entries
+journalctl -t evse-ui-watchdog --since today --no-pager
+
+# Follow live
+journalctl -t evse-ui-watchdog -f
+```
+
+Successful checks are logged at **debug** level (to avoid spam). To see them:
+
+```bash
+journalctl -t evse-ui-watchdog -p debug --since "30 min ago" --no-pager
+```
+
+**6. Dry run (no reboot)**
+
+To verify the script and streak logic without rebooting:
+
+```bash
+sudo EVSE_UI_DRY_RUN=1 /usr/local/bin/evse-ui-watchdog.sh
+```
+
+Stop `evse-ui`, run the script **three times** (waiting for cron or invoking the script manually with a few minutes between runs — or temporarily lower `FAIL_STREAK_MAX` in a copy of the script for testing). With `EVSE_UI_DRY_RUN=1`, the third failure logs that it would reboot but does not call `shutdown`.
+
 ### Step 7: Access the Dashboard
 
 Open your browser and navigate to:
