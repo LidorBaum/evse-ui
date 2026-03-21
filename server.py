@@ -217,8 +217,7 @@ async def _notify_telegram_service_up():
         return
     host = html.escape(socket.gethostname())
     _send_telegram(
-        f"🟢 <b>EVSE-UI is up</b>\n"
-        f"Host: <code>{host}</code>\n"
+        f"🟢 <b>System Up!</b>\n"
         f"Service started (restart or reboot)."
     )
 
