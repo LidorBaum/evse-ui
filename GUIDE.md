@@ -507,6 +507,24 @@ If the Pi sometimes freezes or `evse-ui` stops responding (web UI and Telegram b
 
 > **Note:** This only helps when Linux and `cron` still run. A full kernel lockup needs the [Raspberry Pi hardware watchdog](https://www.raspberrypi.com/documentation/computers/config_txt.html#what-is-the-onboard-watchdog-timer) instead.
 
+**Tailscale and localhost health**
+
+The script first checks **`http://127.0.0.1`** only. That can stay green while **Tailscale** is stuck, so you still cannot SSH or open the UI via Tailscale.
+
+After a successful HTTP check (and after the boot grace period), the script optionally runs **`tailscale status --json`** once. It treats the node as **connected** only if **`BackendState`** is **`Running`** and, when the JSON includes **`Self.Online`**, that field is **true** (older clients without `Online` still use `BackendState` only). If that check fails, it immediately tries to fix things: **`systemctl restart tailscaled`** (or **`start`** if the service was stopped), subject to a **cooldown** (at most once per **30 minutes** by default). This does not prove end-to-end reachability from your phone, but it matches what Tailscale reports as “up” on the Pi.
+
+Disable this behavior (HTTP-only):
+
+```cron
+*/10 * * * * TAILSCALE_CHECK=0 /usr/local/bin/evse-ui-watchdog.sh
+```
+
+Optional: change cooldown (seconds between tailscaled restarts):
+
+```cron
+*/10 * * * * TAILSCALE_RESTART_COOLDOWN_SEC=3600 /usr/local/bin/evse-ui-watchdog.sh
+```
+
 **1. Update the app on the Pi** (so `GET /health` exists in `server.py`), then restart the service:
 
 ```bash
