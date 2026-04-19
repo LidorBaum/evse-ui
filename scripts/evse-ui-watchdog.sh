@@ -4,7 +4,8 @@
 #
 # 1) Probes evse-ui /health on localhost (reboot after repeated failures — see below).
 # 2) If HTTP is OK: optionally checks Tailscale is connected (BackendState + Self.Online when present);
-#    on first failed check, restarts tailscaled (subject to cooldown). HTTP still uses 3×10s retries.
+#    on each failed check, posts a Telegram alert via /api/watchdog/alert and restarts tailscaled.
+#    After TAILSCALE_FAIL_STREAK_MAX consecutive failures, reboots the Pi instead.
 set -u
 set -o pipefail
 
@@ -15,11 +16,10 @@ set -o pipefail
 : "${STREAK_FILE:=/run/evse-ui-watchdog/streak}"
 : "${LOG_TAG:=evse-ui-watchdog}"
 
-# Tailscale: set TAILSCALE_CHECK=0 to disable. Cooldown avoids restart loops.
+# Tailscale: set TAILSCALE_CHECK=0 to disable.
 : "${TAILSCALE_CHECK:=1}"
-: "${TAILSCALE_RESTART_COOLDOWN_SEC:=1800}"
-: "${TAILSCALE_STATE_DIR:=/run/evse-ui-watchdog}"
-: "${TAILSCALE_LAST_RESTART_FILE:=${TAILSCALE_STATE_DIR}/tailscale_last_restart}"
+: "${TAILSCALE_STREAK_FILE:=/run/evse-ui-watchdog/ts_streak}"
+: "${TAILSCALE_FAIL_STREAK_MAX:=3}"
 
 log() {
   logger -t "$LOG_TAG" -- "$*"
@@ -45,6 +45,20 @@ read_streak() {
 write_streak() {
   mkdir -p "$(dirname "$STREAK_FILE")"
   echo "$1" >"$STREAK_FILE"
+}
+
+read_ts_streak() {
+  local s=0
+  if [[ -f "$TAILSCALE_STREAK_FILE" ]]; then
+    s=$(<"$TAILSCALE_STREAK_FILE") || true
+  fi
+  [[ "$s" =~ ^[0-9]+$ ]] || s=0
+  echo "$s"
+}
+
+write_ts_streak() {
+  mkdir -p "$(dirname "$TAILSCALE_STREAK_FILE")"
+  echo "$1" >"$TAILSCALE_STREAK_FILE"
 }
 
 probe() {
@@ -83,31 +97,52 @@ except Exception:
 "
 }
 
+send_alert() {
+  local msg="$1"
+  local payload
+  payload=$(MSG="$msg" python3 -c 'import json,os; print(json.dumps({"message": os.environ["MSG"]}))') || return 0
+  curl -sf --max-time "$HTTP_TIMEOUT" \
+    -H 'Content-Type: application/json' \
+    -d "$payload" \
+    "http://127.0.0.1:${EVSE_UI_PORT}/api/watchdog/alert" >/dev/null \
+    || log "alert POST to /api/watchdog/alert failed"
+}
+
 maybe_fix_tailscale() {
   command -v tailscale >/dev/null 2>&1 || return 0
   [[ "${TAILSCALE_CHECK}" == "1" ]] || return 0
 
   if tailscale_connected_ok; then
-    log_debug "tailscale connected (BackendState Running, Online OK if present)"
+    if [[ -f "$TAILSCALE_STREAK_FILE" ]]; then
+      log_debug "tailscale recovered; clearing streak"
+    fi
+    write_ts_streak 0
     return 0
   fi
 
-  log "tailscale not connected or unhealthy (single check failed) — will try tailscaled restart if allowed"
+  local host ts_streak
+  host=$(hostname 2>/dev/null || echo "pi")
+  ts_streak=$(read_ts_streak)
+  ts_streak=$((ts_streak + 1))
+  write_ts_streak "$ts_streak"
 
-  mkdir -p "$TAILSCALE_STATE_DIR"
-  local now last gap
-  now=$(date +%s)
-  last=0
-  if [[ -f "$TAILSCALE_LAST_RESTART_FILE" ]]; then
-    last=$(<"$TAILSCALE_LAST_RESTART_FILE") || last=0
-  fi
-  [[ "$last" =~ ^[0-9]+$ ]] || last=0
-  gap=$((now - last))
+  log "tailscale not connected (consecutive failures: ${ts_streak}/${TAILSCALE_FAIL_STREAK_MAX})"
 
-  if (( last > 0 && gap < TAILSCALE_RESTART_COOLDOWN_SEC )); then
-    log "tailscale still unhealthy; last tailscaled restart ${gap}s ago (cooldown ${TAILSCALE_RESTART_COOLDOWN_SEC}s) — skipping"
+  if (( ts_streak >= TAILSCALE_FAIL_STREAK_MAX )); then
+    log "tailscaled restarts haven't helped; rebooting"
+    send_alert "🔁 <b>Rebooting ${host}</b>
+Tailscale still down after ${ts_streak} tailscaled restarts — triggering full reboot."
+    write_ts_streak 0
+    if [[ -n "${EVSE_UI_DRY_RUN:-}" ]]; then
+      log "EVSE_UI_DRY_RUN is set: skipping shutdown -r now"
+      return 0
+    fi
+    /sbin/shutdown -r now "evse-ui watchdog: tailscale down after ${TAILSCALE_FAIL_STREAK_MAX} restarts"
     return 0
   fi
+
+  send_alert "⚠️ <b>Tailscale down on ${host}</b>
+evse-ui HTTP is OK, but Tailscale is not connected. Restarting tailscaled (attempt ${ts_streak}/${TAILSCALE_FAIL_STREAK_MAX} before reboot)."
 
   if [[ -n "${EVSE_UI_DRY_RUN:-}" ]]; then
     log "EVSE_UI_DRY_RUN is set: would run systemctl restart tailscaled"
@@ -117,13 +152,10 @@ maybe_fix_tailscale() {
   if ! systemctl is-active --quiet tailscaled 2>/dev/null; then
     log "tailscaled service not active; trying systemctl start tailscaled"
     systemctl start tailscaled || log "systemctl start tailscaled failed (exit $?)"
-    echo "$(date +%s)" >"$TAILSCALE_LAST_RESTART_FILE"
     return 0
   fi
 
-  log "restarting tailscaled"
   if systemctl restart tailscaled; then
-    echo "$(date +%s)" >"$TAILSCALE_LAST_RESTART_FILE"
     log "tailscaled restart issued"
   else
     log "systemctl restart tailscaled failed (exit $?)"

@@ -511,7 +511,15 @@ If the Pi sometimes freezes or `evse-ui` stops responding (web UI and Telegram b
 
 The script first checks **`http://127.0.0.1`** only. That can stay green while **Tailscale** is stuck, so you still cannot SSH or open the UI via Tailscale.
 
-After a successful HTTP check (and after the boot grace period), the script optionally runs **`tailscale status --json`** once. It treats the node as **connected** only if **`BackendState`** is **`Running`** and, when the JSON includes **`Self.Online`**, that field is **true** (older clients without `Online` still use `BackendState` only). If that check fails, it immediately tries to fix things: **`systemctl restart tailscaled`** (or **`start`** if the service was stopped), subject to a **cooldown** (at most once per **30 minutes** by default). This does not prove end-to-end reachability from your phone, but it matches what Tailscale reports as “up” on the Pi.
+After a successful HTTP check (and after the boot grace period), the script runs **`tailscale status --json`** once. It treats the node as **connected** only if **`BackendState`** is **`Running`** and, when the JSON includes **`Self.Online`**, that field is **true** (older clients without `Online` still use `BackendState` only).
+
+On each failed Tailscale check, the script:
+
+1. Increments a Tailscale-failure streak counter (`/run/evse-ui-watchdog/ts_streak`).
+2. Sends a **Telegram alert** via a local POST to `http://127.0.0.1:PORT/api/watchdog/alert` so you're notified that Tailscale is down even though the app itself is fine.
+3. Runs **`systemctl restart tailscaled`** (or **`start`** if the service was stopped). No cooldown — every failed check triggers a restart.
+
+After **`TAILSCALE_FAIL_STREAK_MAX`** consecutive failed checks (default **3**, ≈30 min), the script gives up on soft restarts and runs **`shutdown -r now`** to fully reboot the Pi. Any successful Tailscale check resets the streak back to 0. The counter lives on tmpfs, so it self-clears on reboot.
 
 Disable this behavior (HTTP-only):
 
@@ -519,10 +527,10 @@ Disable this behavior (HTTP-only):
 */10 * * * * TAILSCALE_CHECK=0 /usr/local/bin/evse-ui-watchdog.sh
 ```
 
-Optional: change cooldown (seconds between tailscaled restarts):
+Optional: change how many failed checks trigger the full reboot:
 
 ```cron
-*/10 * * * * TAILSCALE_RESTART_COOLDOWN_SEC=3600 /usr/local/bin/evse-ui-watchdog.sh
+*/10 * * * * TAILSCALE_FAIL_STREAK_MAX=5 /usr/local/bin/evse-ui-watchdog.sh
 ```
 
 **1. Update the app on the Pi** (so `GET /health` exists in `server.py`), then restart the service:
@@ -584,7 +592,7 @@ Successful checks are logged at **debug** level (to avoid spam). To see them:
 journalctl -t evse-ui-watchdog -p debug --since "30 min ago" --no-pager
 ```
 
-**6. Dry run (no reboot)**
+**6. Dry run (no reboot, no tailscaled restart)**
 
 To verify the script and streak logic without rebooting:
 
@@ -592,7 +600,43 @@ To verify the script and streak logic without rebooting:
 sudo EVSE_UI_DRY_RUN=1 /usr/local/bin/evse-ui-watchdog.sh
 ```
 
-Stop `evse-ui`, run the script **three times** (waiting for cron or invoking the script manually with a few minutes between runs — or temporarily lower `FAIL_STREAK_MAX` in a copy of the script for testing). With `EVSE_UI_DRY_RUN=1`, the third failure logs that it would reboot but does not call `shutdown`.
+With `EVSE_UI_DRY_RUN=1`, both the HTTP-failure reboot and the Tailscale-failure reboot are skipped (logged as *"would shutdown -r now"*), and `systemctl restart tailscaled` is also skipped.
+
+**HTTP-failure path:** stop `evse-ui`, then run the script three times (waiting for cron or invoking manually) — the third failure logs that it would reboot.
+
+**Tailscale-failure path (fake the failure without touching real Tailscale):** shadow the `tailscale` CLI with a stub that always reports "not connected":
+
+```bash
+cat <<'EOF' | sudo tee /usr/local/bin/tailscale-fake >/dev/null
+#!/bin/sh
+if [ "$1" = "status" ] && [ "$2" = "--json" ]; then
+  echo '{"BackendState":"NoState","Self":{"Online":false}}'
+  exit 0
+fi
+exit 0
+EOF
+sudo chmod +x /usr/local/bin/tailscale-fake
+
+# Run the watchdog with the stub ahead of real tailscale on PATH
+sudo ln -sf /usr/local/bin/tailscale-fake /tmp/tailscale
+sudo env PATH=/tmp:/usr/bin:/bin EVSE_UI_DRY_RUN=1 /usr/local/bin/evse-ui-watchdog.sh
+```
+
+Run three times — you'll get a Telegram alert each time, and the third invocation logs *"would shutdown -r now"* instead of rebooting. To jump straight to the reboot branch, prime the streak:
+
+```bash
+sudo mkdir -p /run/evse-ui-watchdog
+echo 2 | sudo tee /run/evse-ui-watchdog/ts_streak
+```
+
+Clean up afterwards:
+
+```bash
+sudo rm -f /usr/local/bin/tailscale-fake /tmp/tailscale
+echo 0 | sudo tee /run/evse-ui-watchdog/ts_streak
+```
+
+**Real test (no dry-run):** `sudo tailscale down` actually disconnects the node while leaving the daemon running. The next watchdog run sends an alert and runs `systemctl restart tailscaled`, which reconnects automatically. Note: if you are SSH'd in over Tailscale, `tailscale down` drops your session until the restart reconnects.
 
 ### Step 7: Access the Dashboard
 

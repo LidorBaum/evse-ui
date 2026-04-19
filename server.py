@@ -576,6 +576,16 @@ def health():
     return {"ok": True}
 
 
+@app.post("/api/watchdog/alert")
+def api_watchdog_alert(body: dict):
+    """Relay a watchdog event to Telegram. Intended for local scripts only."""
+    message = (body.get("message") or "").strip()
+    if not message:
+        return {"ok": False, "error": "message required"}
+    _send_telegram(message)
+    return {"ok": True}
+
+
 @app.get("/api/state")
 def api_state():
     return {
