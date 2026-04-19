@@ -3,9 +3,8 @@
 # Intended for root cron every 10 minutes — see GUIDE.md (Health watchdog section).
 #
 # 1) Probes evse-ui /health on localhost (reboot after repeated failures — see below).
-# 2) If HTTP is OK: optionally checks Tailscale is connected (BackendState + Self.Online when present);
-#    on each failed check, posts a Telegram alert via /api/watchdog/alert and restarts tailscaled.
-#    After TAILSCALE_FAIL_STREAK_MAX consecutive failures, reboots the Pi instead.
+# 2) If HTTP is OK: optionally checks Tailscale is connected (BackendState + Self.Online when present).
+#    If 3 consecutive checks (10s apart) all fail, posts a Telegram alert and reboots the Pi.
 set -u
 set -o pipefail
 
@@ -18,8 +17,6 @@ set -o pipefail
 
 # Tailscale: set TAILSCALE_CHECK=0 to disable.
 : "${TAILSCALE_CHECK:=1}"
-: "${TAILSCALE_STREAK_FILE:=/run/evse-ui-watchdog/ts_streak}"
-: "${TAILSCALE_FAIL_STREAK_MAX:=3}"
 
 log() {
   logger -t "$LOG_TAG" -- "$*"
@@ -45,20 +42,6 @@ read_streak() {
 write_streak() {
   mkdir -p "$(dirname "$STREAK_FILE")"
   echo "$1" >"$STREAK_FILE"
-}
-
-read_ts_streak() {
-  local s=0
-  if [[ -f "$TAILSCALE_STREAK_FILE" ]]; then
-    s=$(<"$TAILSCALE_STREAK_FILE") || true
-  fi
-  [[ "$s" =~ ^[0-9]+$ ]] || s=0
-  echo "$s"
-}
-
-write_ts_streak() {
-  mkdir -p "$(dirname "$TAILSCALE_STREAK_FILE")"
-  echo "$1" >"$TAILSCALE_STREAK_FILE"
 }
 
 probe() {
@@ -112,54 +95,30 @@ maybe_fix_tailscale() {
   command -v tailscale >/dev/null 2>&1 || return 0
   [[ "${TAILSCALE_CHECK}" == "1" ]] || return 0
 
-  if tailscale_connected_ok; then
-    if [[ -f "$TAILSCALE_STREAK_FILE" ]]; then
-      log_debug "tailscale recovered; clearing streak"
-    fi
-    write_ts_streak 0
-    return 0
-  fi
-
-  local host ts_streak
-  host=$(hostname 2>/dev/null || echo "pi")
-  ts_streak=$(read_ts_streak)
-  ts_streak=$((ts_streak + 1))
-  write_ts_streak "$ts_streak"
-
-  log "tailscale not connected (consecutive failures: ${ts_streak}/${TAILSCALE_FAIL_STREAK_MAX})"
-
-  if (( ts_streak >= TAILSCALE_FAIL_STREAK_MAX )); then
-    log "tailscaled restarts haven't helped; rebooting"
-    send_alert "🔁 <b>Rebooting ${host}</b>
-Tailscale still down after ${ts_streak} tailscaled restarts — triggering full reboot."
-    write_ts_streak 0
-    if [[ -n "${EVSE_UI_DRY_RUN:-}" ]]; then
-      log "EVSE_UI_DRY_RUN is set: skipping shutdown -r now"
+  # Retry to avoid rebooting on transient CLI hiccups (e.g. daemon briefly unavailable).
+  local attempt
+  for attempt in 1 2 3; do
+    if tailscale_connected_ok; then
+      log_debug "tailscale connected (BackendState Running, Online OK if present)"
       return 0
     fi
-    /sbin/shutdown -r now "evse-ui watchdog: tailscale down after ${TAILSCALE_FAIL_STREAK_MAX} restarts"
-    return 0
-  fi
+    if [[ "$attempt" -lt 3 ]]; then
+      sleep 10
+    fi
+  done
 
-  send_alert "⚠️ <b>Tailscale down on ${host}</b>
-evse-ui HTTP is OK, but Tailscale is not connected. Restarting tailscaled (attempt ${ts_streak}/${TAILSCALE_FAIL_STREAK_MAX} before reboot)."
+  local host
+  host=$(hostname 2>/dev/null || echo "pi")
+  log "tailscale not connected after 3 attempts (10s apart) — rebooting"
+  send_alert "🔁 <b>Rebooting ${host}</b>
+evse-ui HTTP is OK, but Tailscale is not connected after 3 checks (10s apart). Triggering full reboot."
 
   if [[ -n "${EVSE_UI_DRY_RUN:-}" ]]; then
-    log "EVSE_UI_DRY_RUN is set: would run systemctl restart tailscaled"
+    log "EVSE_UI_DRY_RUN is set: skipping shutdown -r now"
     return 0
   fi
 
-  if ! systemctl is-active --quiet tailscaled 2>/dev/null; then
-    log "tailscaled service not active; trying systemctl start tailscaled"
-    systemctl start tailscaled || log "systemctl start tailscaled failed (exit $?)"
-    return 0
-  fi
-
-  if systemctl restart tailscaled; then
-    log "tailscaled restart issued"
-  else
-    log "systemctl restart tailscaled failed (exit $?)"
-  fi
+  /sbin/shutdown -r now "evse-ui watchdog: tailscale unreachable"
 }
 
 uptime_sec=$(read_uptime_sec)
