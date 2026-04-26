@@ -106,7 +106,7 @@
   <div id="mergeModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4 shadow-xl">
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">🔗 Merge Sessions</h3>
-      <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Select neighboring sessions to merge (same user, within 30 min)</p>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Select sessions to merge (same user, all within the same period — regular or clock hours)</p>
       <input type="hidden" id="mergeMainSessionId" />
       <div id="mergeSessionsList" class="max-h-64 overflow-y-auto space-y-2 mb-4"></div>
       <div id="mergePreview" class="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg mb-4 hidden">
@@ -242,7 +242,7 @@ async function openMergeModal(sessionId) {
     mergeNeighbors = data.neighbors || [];
     
     if (mergeNeighbors.length === 0) {
-      document.getElementById('mergeSessionsList').innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-center py-4">No neighboring sessions found (same user, within 30 min gap)</div>';
+      document.getElementById('mergeSessionsList').innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-center py-4">No mergeable sessions found (need same user, same period)</div>';
       return;
     }
     

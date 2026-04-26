@@ -7,7 +7,7 @@ import socket
 import subprocess
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -116,6 +116,34 @@ def _is_minute_in_clock(minute: int, clock_start: str, clock_end: str) -> bool:
     else:
         # Overnight range
         return minute >= start_mins or minute < end_mins
+
+def _span_period(start_dt: datetime, end_dt: datetime) -> str:
+    """Return 'clock', 'regular', or 'mixed' for the time span [start_dt, end_dt].
+
+    A span is 'clock' if every minute lies in clock-discount hours, 'regular' if every
+    minute lies outside, else 'mixed'. Uses UTC+2 approximation to match cost calc.
+    """
+    if end_dt < start_dt:
+        return "mixed"
+    clock_start = app_settings.get("clock_start", "23:00")
+    clock_end = app_settings.get("clock_end", "07:00")
+    total_secs = max(60, int((end_dt - start_dt).total_seconds()))
+    seen_clock = False
+    seen_regular = False
+    t = 0
+    while t <= total_secs:
+        sample = start_dt + timedelta(seconds=t)
+        jh = (sample.hour + 2) % 24
+        mod = jh * 60 + sample.minute
+        if _is_minute_in_clock(mod, clock_start, clock_end):
+            seen_clock = True
+        else:
+            seen_regular = True
+        if seen_clock and seen_regular:
+            return "mixed"
+        t += 60
+    return "clock" if seen_clock else "regular"
+
 
 def _calc_session_cost(energy: float, started_at: str, ended_at: str) -> float:
     """Calculate session cost with clock discount."""
@@ -768,73 +796,55 @@ def api_session_user(session_id: str, body: dict):
 
 @app.get("/api/session/{session_id}/neighbors")
 def api_session_neighbors(session_id: str):
-    """Find neighboring sessions that can be merged (same user, within 30 min gap)."""
-    MAX_GAP_MINUTES = 30
-    
+    """Find sessions that can be merged: same user AND combined window stays
+    fully within one period (clock-hours or regular-hours, no boundary crossing)."""
+
+    def parse_ts(ts):
+        if ts is None:
+            return None
+        try:
+            return datetime.fromisoformat(ts.replace('Z', '+00:00'))
+        except Exception:
+            return None
+
     with _sessions_lock:
-        # Find the target session
         all_sessions = sessions + ([current_session] if current_session else [])
         target = None
-        target_idx = -1
-        
-        for i, s in enumerate(all_sessions):
+        for s in all_sessions:
             if s.get("id") == session_id:
                 target = s
-                target_idx = i
                 break
-        
+
         if target is None:
             return {"ok": False, "error": "Session not found"}
-        
+
         target_user = target.get("meta", {}).get("user", "Unknown")
-        target_start = target.get("started_at")
-        target_end = target.get("ended_at")
-        
+        t_start = parse_ts(target.get("started_at"))
+        t_end = parse_ts(target.get("ended_at"))
+        if t_start is None or t_end is None:
+            return {"ok": True, "session": target, "neighbors": []}
+
+        target_period = _span_period(t_start, t_end)
+        if target_period == "mixed":
+            return {"ok": True, "session": target, "neighbors": []}
+
         neighbors = []
-        
-        # Check all other sessions
-        for i, s in enumerate(all_sessions):
+        for s in all_sessions:
             if s.get("id") == session_id:
                 continue
-            
-            s_user = s.get("meta", {}).get("user", "Unknown")
-            if s_user != target_user:
+            if s.get("meta", {}).get("user", "Unknown") != target_user:
                 continue
-            
-            s_start = s.get("started_at")
-            s_end = s.get("ended_at")
-            
-            # Check if within 30 min gap
-            try:
-                from datetime import datetime
-                
-                def parse_ts(ts):
-                    if ts is None:
-                        return None
-                    return datetime.fromisoformat(ts.replace('Z', '+00:00'))
-                
-                t_start = parse_ts(target_start)
-                t_end = parse_ts(target_end)
-                s_start_dt = parse_ts(s_start)
-                s_end_dt = parse_ts(s_end)
-                
-                # Check if s ends just before target starts
-                if s_end_dt and t_start:
-                    gap = abs((t_start - s_end_dt).total_seconds() / 60)
-                    if gap <= MAX_GAP_MINUTES:
-                        neighbors.append(s)
-                        continue
-                
-                # Check if target ends just before s starts
-                if t_end and s_start_dt:
-                    gap = abs((s_start_dt - t_end).total_seconds() / 60)
-                    if gap <= MAX_GAP_MINUTES:
-                        neighbors.append(s)
-                        continue
-                        
-            except Exception:
+
+            s_start = parse_ts(s.get("started_at"))
+            s_end = parse_ts(s.get("ended_at"))
+            if s_start is None or s_end is None:
                 continue
-        
+
+            combined_start = min(t_start, s_start)
+            combined_end = max(t_end, s_end)
+            if _span_period(combined_start, combined_end) == target_period:
+                neighbors.append(s)
+
         return {"ok": True, "session": target, "neighbors": neighbors}
 
 
@@ -874,7 +884,27 @@ def api_sessions_merge(body: dict):
         
         if len(to_merge) < 2:
             return {"ok": False, "error": "Could not find enough sessions to merge"}
-        
+
+        # Validate: same user and combined window in single period (clock or regular)
+        users = {s.get("meta", {}).get("user", "Unknown") for s in to_merge}
+        if len(users) > 1:
+            return {"ok": False, "error": "All sessions must have the same user"}
+
+        def _parse(ts):
+            if ts is None:
+                return None
+            try:
+                return datetime.fromisoformat(ts.replace('Z', '+00:00'))
+            except Exception:
+                return None
+
+        starts = [_parse(s.get("started_at")) for s in to_merge]
+        ends = [_parse(s.get("ended_at")) for s in to_merge]
+        if any(x is None for x in starts) or any(x is None for x in ends):
+            return {"ok": False, "error": "Sessions missing start/end times"}
+        if _span_period(min(starts), max(ends)) == "mixed":
+            return {"ok": False, "error": "Sessions cross between regular and clock hours"}
+
         # Sort by start time
         to_merge.sort(key=lambda x: x.get("started_at", ""))
         
