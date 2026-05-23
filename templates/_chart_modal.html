@@ -109,7 +109,22 @@
 
     const kwhBase = kwhVals.length ? kwhVals[0] : 0;
     const kwData = samples.map(s => ({ x: s.ts, y: s.kw }));
-    const battPctData = samples.map(s => ({ x: s.ts, y: s.kwh != null ? ((s.kwh - kwhBase) / battCap) * 100 : null }));
+
+    // Battery % from integrated power (smooth) — counter resolution is 0.1 kWh
+    // which would render as visible stair-steps at typical EV battery sizes.
+    // Final value still validated against counter delta in the meta line.
+    let cumKwh = 0;
+    let prevTs = null;
+    const battPctData = samples.map(s => {
+      const tsMs = s.ts ? new Date(s.ts).getTime() : null;
+      if (s.kw != null && prevTs != null && tsMs != null) {
+        cumKwh += s.kw * ((tsMs - prevTs) / 3600000);
+      }
+      if (tsMs != null && s.kw != null) prevTs = tsMs;
+      else if (s.kw == null) prevTs = null; // reset across reboot gap
+      return { x: s.ts, y: (cumKwh / battCap) * 100 };
+    });
+
     const ampsData = samples.map(s => ({ x: s.ts, y: s.amps }));
     const ampsRawVals = samples.map(s => s.amps);
     const ampsChanged = (() => {
@@ -151,7 +166,7 @@
         backgroundColor: 'rgba(59, 130, 246, 0.0)',
         borderWidth: 1.5,
         borderDash: [4, 4],
-        tension: 0.1,
+        tension: 0.35,
         pointRadius: 0,
         pointHoverRadius: 3,
         fill: false,
