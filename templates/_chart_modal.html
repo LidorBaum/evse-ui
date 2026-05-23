@@ -28,14 +28,6 @@
   let chartLiveTimer = null;
   let chartCurrentSessionId = null;
 
-  function fmtChartTime(isoStr) {
-    if (!isoStr) return '';
-    try {
-      const d = new Date(isoStr);
-      return d.toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit' });
-    } catch (e) { return ''; }
-  }
-
   function fmtChartDurationMins(mins) {
     if (mins < 1) return Math.round(mins * 60) + 's';
     if (mins < 60) return Math.round(mins) + 'm';
@@ -115,20 +107,19 @@
     document.getElementById('chartMeta').textContent =
       `${fmtChartDurationMins(durationMins)} · +${battPctDelta.toFixed(1)}% battery · peak ${peakKw.toFixed(2)} kW · avg ${avgKw.toFixed(2)} kW`;
 
-    const labels = samples.map(s => fmtChartTime(s.ts));
-    const kwData = samples.map(s => s.kw);
     const kwhBase = kwhVals.length ? kwhVals[0] : 0;
-    const battPctData = samples.map(s => s.kwh != null ? ((s.kwh - kwhBase) / battCap) * 100 : null);
-    const ampsData = samples.map(s => s.amps);
+    const kwData = samples.map(s => ({ x: s.ts, y: s.kw }));
+    const battPctData = samples.map(s => ({ x: s.ts, y: s.kwh != null ? ((s.kwh - kwhBase) / battCap) * 100 : null }));
+    const ampsData = samples.map(s => ({ x: s.ts, y: s.amps }));
+    const ampsRawVals = samples.map(s => s.amps);
     const ampsChanged = (() => {
-      const seen = new Set(ampsData.filter(a => a != null));
+      const seen = new Set(ampsRawVals.filter(a => a != null));
       return seen.size > 1;
     })();
 
     const isDark = document.documentElement.classList.contains('dark');
 
     if (sessionChart && !firstLoad) {
-      sessionChart.data.labels = labels;
       sessionChart.data.datasets[0].data = kwData;
       sessionChart.data.datasets[1].data = battPctData;
       if (sessionChart.data.datasets[2]) sessionChart.data.datasets[2].data = ampsData;
@@ -187,7 +178,7 @@
     const ctx = document.getElementById('sessionChart').getContext('2d');
     sessionChart = new Chart(ctx, {
       type: 'line',
-      data: { labels, datasets },
+      data: { datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -208,7 +199,7 @@
             cornerRadius: 8,
             callbacks: {
               label: function(ctx) {
-                const v = ctx.raw;
+                const v = ctx.parsed && ctx.parsed.y;
                 if (v == null) return ctx.dataset.label + ': —';
                 if (ctx.dataset.label === 'Power (kW)') return 'Power: ' + v.toFixed(2) + ' kW';
                 if (ctx.dataset.label === 'Battery %') return '+' + v.toFixed(1) + '% battery';
@@ -220,12 +211,23 @@
         },
         scales: {
           x: {
+            type: 'time',
+            time: {
+              tooltipFormat: 'HH:mm:ss',
+              displayFormats: {
+                second: 'HH:mm:ss',
+                minute: 'HH:mm',
+                hour: 'HH:mm',
+                day: 'MMM d',
+              }
+            },
             grid: { display: false },
             ticks: {
               color: isDark ? '#9ca3af' : '#6b7280',
               maxRotation: 0,
               autoSkip: true,
-              maxTicksLimit: 8,
+              autoSkipPadding: 12,
+              source: 'auto',
             }
           },
           y: {
