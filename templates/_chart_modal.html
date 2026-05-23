@@ -125,6 +125,10 @@
       return { x: s.ts, y: (cumKwh / battCap) * 100 };
     });
 
+    // Same curve as battery %, but expressed as cumulative kWh.
+    // Drives a second left-side axis with kWh ticks.
+    const cumKwhData = battPctData.map(p => ({ x: p.x, y: (p.y * battCap) / 100 }));
+
     const ampsData = samples.map(s => ({ x: s.ts, y: s.amps }));
     const ampsRawVals = samples.map(s => s.amps);
     const ampsChanged = (() => {
@@ -137,7 +141,8 @@
     if (sessionChart && !firstLoad) {
       sessionChart.data.datasets[0].data = kwData;
       sessionChart.data.datasets[1].data = battPctData;
-      if (sessionChart.data.datasets[2]) sessionChart.data.datasets[2].data = ampsData;
+      sessionChart.data.datasets[2].data = cumKwhData;
+      if (sessionChart.data.datasets[3]) sessionChart.data.datasets[3].data = ampsData;
       sessionChart.update('none');
       return;
     }
@@ -171,6 +176,20 @@
         pointHoverRadius: 3,
         fill: false,
         spanGaps: false,
+      },
+      {
+        // Invisible — exists only to drive the left-side kWh axis scale
+        // and enrich the tooltip with a kWh value alongside the %.
+        label: 'Cumulative kWh',
+        data: cumKwhData,
+        yAxisID: 'y3',
+        borderColor: 'rgba(0,0,0,0)',
+        backgroundColor: 'rgba(0,0,0,0)',
+        borderWidth: 0,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: false,
+        spanGaps: false,
       }
     ];
 
@@ -202,7 +221,12 @@
           legend: {
             display: true,
             position: 'top',
-            labels: { boxWidth: 12, font: { size: 11 }, color: isDark ? '#d1d5db' : '#4b5563' }
+            labels: {
+              boxWidth: 12,
+              font: { size: 11 },
+              color: isDark ? '#d1d5db' : '#4b5563',
+              filter: (item) => item.text !== 'Cumulative kWh',
+            }
           },
           tooltip: {
             backgroundColor: isDark ? '#374151' : '#fff',
@@ -218,6 +242,7 @@
                 if (v == null) return ctx.dataset.label + ': —';
                 if (ctx.dataset.label === 'Power (kW)') return 'Power: ' + v.toFixed(2) + ' kW';
                 if (ctx.dataset.label === 'Battery %') return '+' + v.toFixed(1) + '% battery';
+                if (ctx.dataset.label === 'Cumulative kWh') return '+' + v.toFixed(2) + ' kWh';
                 if (ctx.dataset.label === 'Set amps') return v + ' A';
                 return ctx.dataset.label + ': ' + v;
               }
@@ -250,6 +275,16 @@
             beginAtZero: true,
             grid: { color: isDark ? '#374151' : '#f3f4f6' },
             ticks: { color: isDark ? '#9ca3af' : '#6b7280', callback: v => v + ' kW' }
+          },
+          y3: {
+            position: 'left',
+            beginAtZero: true,
+            grid: { display: false },
+            ticks: {
+              color: 'rgb(59, 130, 246)',
+              callback: v => v.toFixed(1) + ' kWh',
+              maxTicksLimit: 6,
+            }
           },
           y1: {
             position: 'right',
