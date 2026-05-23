@@ -442,9 +442,11 @@ def _make_sample(charge: dict, ts: str) -> dict:
         except (TypeError, ValueError):
             return None
 
+    # total_energy is the instantaneous charging rate in kW (matches dashboard).
+    # current_energy is the same in W and is only used as the active/not-active flag.
     return {
         "ts": ts,
-        "kw": _f(charge.get("current_energy")),
+        "kw": _f(charge.get("total_energy")),
         "kwh": _f(charge.get("current_amount")),
         "amps": _i((latest_config or {}).get("charge_amps")),
     }
