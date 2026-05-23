@@ -7,3 +7,4 @@ __pycache__/
 sessions_import.json
 sessions.json
 settings.json
+samples/

@@ -63,6 +63,11 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 SESSIONS_FILE = os.getenv("SESSIONS_FILE", "sessions.json")
 MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "2000"))
 
+# ---- Per-session sample logging (charging curve) ----
+SAMPLES_DIR = os.getenv("SAMPLES_DIR", "samples")
+SAMPLE_INTERVAL_SEC = int(os.getenv("SAMPLE_INTERVAL_SEC", "10"))
+os.makedirs(SAMPLES_DIR, exist_ok=True)
+
 # ---- Settings config ----
 SETTINGS_FILE = os.getenv("SETTINGS_FILE", "settings.json")
 
@@ -380,6 +385,23 @@ def _load_sessions():
         sessions = []
         current_session = None
 
+    # If an active session was resumed and already has samples on disk,
+    # write a null sentinel so the chart shows a gap across the downtime.
+    try:
+        if current_session is not None:
+            sid = current_session.get("id")
+            if sid and os.path.exists(_samples_path(sid)):
+                _append_sample(sid, {
+                    "ts": _utc_iso(),
+                    "kw": None,
+                    "kwh": None,
+                    "amps": None,
+                })
+    except Exception:
+        pass
+
+    _cleanup_orphan_samples()
+
 
 def _save_sessions():
     # Called from MQTT thread; keep it simple and safe.
@@ -396,6 +418,114 @@ def _save_sessions():
         os.replace(tmp, SESSIONS_FILE)
     except Exception:
         # If disk write fails, don't crash the bridge.
+        pass
+
+
+# ---- Per-session sample helpers (NDJSON, one file per session) ----
+_last_sample_ts: float | None = None  # monotonic clock; throttles sampling
+
+
+def _samples_path(session_id: str) -> str:
+    return os.path.join(SAMPLES_DIR, f"{session_id}.jsonl")
+
+
+def _make_sample(charge: dict, ts: str) -> dict:
+    def _f(v):
+        try:
+            return float(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    def _i(v):
+        try:
+            return int(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "ts": ts,
+        "kw": _f(charge.get("current_energy")),
+        "kwh": _f(charge.get("current_amount")),
+        "amps": _i((latest_config or {}).get("charge_amps")),
+    }
+
+
+def _append_sample(session_id: str, sample: dict):
+    try:
+        with open(_samples_path(session_id), "a", encoding="utf-8") as f:
+            f.write(json.dumps(sample, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def _read_samples(session_id: str) -> list[dict]:
+    p = _samples_path(session_id)
+    if not os.path.exists(p):
+        return []
+    out: list[dict] = []
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    out.append(json.loads(line))
+                except Exception:
+                    continue
+    except Exception:
+        return []
+    return out
+
+
+def _delete_samples(session_id: str):
+    try:
+        p = _samples_path(session_id)
+        if os.path.exists(p):
+            os.remove(p)
+    except Exception:
+        pass
+
+
+def _merge_sample_files(target_id: str, source_ids: list[str]):
+    """Concat samples from source files (incl. target) into target, sorted by ts.
+    Delete source files other than the target."""
+    all_samples: list[dict] = []
+    for sid in set(source_ids) | {target_id}:
+        all_samples.extend(_read_samples(sid))
+    all_samples.sort(key=lambda s: s.get("ts", ""))
+    target_path = _samples_path(target_id)
+    try:
+        tmp = target_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            for s in all_samples:
+                f.write(json.dumps(s, ensure_ascii=False) + "\n")
+        os.replace(tmp, target_path)
+    except Exception:
+        pass
+    for sid in source_ids:
+        if sid != target_id:
+            _delete_samples(sid)
+
+
+def _cleanup_orphan_samples():
+    """Delete sample files whose session ID does not exist in sessions/current_session."""
+    try:
+        if not os.path.isdir(SAMPLES_DIR):
+            return
+        valid_ids = {s.get("id") for s in sessions if s.get("id")}
+        if current_session is not None and current_session.get("id"):
+            valid_ids.add(current_session.get("id"))
+        for fname in os.listdir(SAMPLES_DIR):
+            if not fname.endswith(".jsonl"):
+                continue
+            sid = fname[:-len(".jsonl")]
+            if sid not in valid_ids:
+                try:
+                    os.remove(os.path.join(SAMPLES_DIR, fname))
+                except Exception:
+                    pass
+    except Exception:
         pass
 
 
@@ -452,7 +582,7 @@ def _update_sessions_from_charge(charge: dict):
       - When it goes back to 0 (or None) after being active, close the session.
     We can refine this later once we see real payloads.
     """
-    global current_session, sessions
+    global current_session, sessions, _last_sample_ts
 
     ts = _utc_iso()
     energy = charge.get("current_energy")
@@ -497,6 +627,9 @@ def _update_sessions_from_charge(charge: dict):
                 },
             }
             _save_sessions()
+            # First sample at session start
+            _last_sample_ts = time.monotonic()
+            _append_sample(session_id, _make_sample(charge, ts))
             # Telegram notification for session start
             _send_telegram(f"🔌 <b>Charging Started</b>\n👤 User: {user}")
         elif current_session is not None and not is_active:
@@ -516,6 +649,9 @@ def _update_sessions_from_charge(charge: dict):
             user = current_session.get("meta", {}).get("user", "Unknown")
             started_at = current_session.get("started_at", ts)
             sessions.append(current_session)
+            # Final sample at session end
+            _append_sample(current_session["id"], _make_sample(charge, ts))
+            _last_sample_ts = None
             current_session = None
             _save_sessions()
             # Telegram notification for session end
@@ -532,6 +668,11 @@ def _update_sessions_from_charge(charge: dict):
             # Update rolling values while charging
             current_session["end_amount_kwh"] = amount_val
             _save_sessions()
+            # Throttled charging-curve sample
+            now_mono = time.monotonic()
+            if _last_sample_ts is None or (now_mono - _last_sample_ts) >= SAMPLE_INTERVAL_SEC:
+                _last_sample_ts = now_mono
+                _append_sample(current_session["id"], _make_sample(charge, ts))
 
 
 def on_connect(client, userdata, flags, rc):
@@ -848,6 +989,43 @@ def api_session_neighbors(session_id: str):
         return {"ok": True, "session": target, "neighbors": neighbors}
 
 
+@app.get("/api/session/{session_id}/samples")
+def api_session_samples(session_id: str):
+    """Per-sample charging telemetry (kW / kWh / amps) for one session.
+    For ongoing sessions appends a synthetic 'now' sample from latest_charge."""
+    with _sessions_lock:
+        target = None
+        ongoing = False
+        if current_session is not None and current_session.get("id") == session_id:
+            target = current_session
+            ongoing = True
+        else:
+            for s in sessions:
+                if s.get("id") == session_id:
+                    target = s
+                    break
+
+        if target is None:
+            return {"ok": False, "error": "Session not found"}
+
+        samples = _read_samples(session_id)
+
+        if ongoing and latest_charge:
+            samples.append(_make_sample(latest_charge, _utc_iso()))
+
+        return {
+            "ok": True,
+            "session": {
+                "id": target.get("id"),
+                "started_at": target.get("started_at"),
+                "ended_at": target.get("ended_at"),
+                "meta": target.get("meta", {}),
+            },
+            "samples": samples,
+            "ongoing": ongoing,
+        }
+
+
 @app.delete("/api/session/{session_id}")
 def api_session_delete(session_id: str):
     """Delete a completed session. Cannot delete the current (ongoing) session."""
@@ -861,6 +1039,7 @@ def api_session_delete(session_id: str):
             if s.get("id") == session_id:
                 sessions.pop(i)
                 _save_sessions()
+                _delete_samples(session_id)
                 return {"ok": True}
 
     return {"ok": False, "error": "Session not found"}
@@ -951,9 +1130,10 @@ def api_sessions_merge(body: dict):
         
         # Sort by start time
         sessions.sort(key=lambda x: x.get("started_at", ""))
-        
+
         _save_sessions()
-        
+        _merge_sample_files(merged["id"], session_ids)
+
         return {"ok": True, "merged": merged}
 
 
