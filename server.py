@@ -1584,10 +1584,15 @@ def api_amps(amps: int):
 
 
 def _read_template(name: str) -> str:
-    """Read an HTML template file from the templates directory."""
+    """Read an HTML template file. Substitutes {{CHART_MODAL}} with the shared partial."""
     template_path = TEMPLATES_DIR / name
     with open(template_path, "r", encoding="utf-8") as f:
-        return f.read()
+        html = f.read()
+    if "{{CHART_MODAL}}" in html:
+        partial_path = TEMPLATES_DIR / "_chart_modal.html"
+        with open(partial_path, "r", encoding="utf-8") as f:
+            html = html.replace("{{CHART_MODAL}}", f.read())
+    return html
 
 
 def _check_auth(evse_auth: str | None):
