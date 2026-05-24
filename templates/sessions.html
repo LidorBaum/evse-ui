@@ -7,6 +7,7 @@
   <title>Sessions - MG4 Charger</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script>
     tailwind.config = { darkMode: 'class' }
   </script>
@@ -119,6 +120,8 @@
       </div>
     </div>
   </div>
+
+  {{CHART_MODAL}}
 
   <!-- User Switch Modal -->
   <div id="userModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -756,6 +759,9 @@ function fmtSession(s){
     ${!ongoing ? `<button onclick="openMergeModal('${s.id}')" class="text-gray-400 dark:text-gray-500 hover:text-purple-500 dark:hover:text-purple-400 px-2 transition" title="Merge with neighbors">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
     </button>` : ''}
+    <button onclick="openChartModal('${s.id}')" class="text-gray-400 dark:text-gray-500 hover:text-indigo-500 dark:hover:text-indigo-400 px-2 transition" title="View charging curve">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M7 14l4-4 3 3 5-6"/></svg>
+    </button>
     <button onclick="openNoteModal('${s.id}', '${note.replace(/'/g, "\\'")}')" class="text-gray-400 dark:text-gray-500 hover:text-emerald-500 dark:hover:text-emerald-400 px-2 transition" title="${note || 'Add note'}">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
     </button>
@@ -775,6 +781,7 @@ async function loadSettings(){
     clockSettings.clock_start = s.clock_start || '23:00';
     clockSettings.clock_end = s.clock_end || '07:00';
     availableUsers = s.users || ['User'];
+    window.batteryCapacity = s.battery_capacity_kwh || 64;
   } catch(e) {}
 }
 

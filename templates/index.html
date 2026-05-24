@@ -6,6 +6,8 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚗</text></svg>">
   <title>MG4 Charger Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -243,6 +245,9 @@
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2 select-none" ondblclick="toggleDemoMode()">
               Status
               <span id="chargingBolt" class="hidden text-xl bolt-animate">⚡</span>
+              <button id="liveChartBtn" onclick="openLiveChart()" class="hidden text-gray-400 dark:text-gray-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition" title="View live charging curve">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M7 14l4-4 3 3 5-6"/></svg>
+              </button>
             </h2>
             <span id="availability" class="text-sm font-medium text-gray-600 dark:text-gray-400">...</span>
           </div>
@@ -270,6 +275,8 @@
       <div id="history" class="text-sm text-gray-500 dark:text-gray-400">No sessions yet.</div>
     </div>
   </main>
+
+  {{CHART_MODAL}}
 
   <!-- Session Note Modal -->
   <div id="noteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -766,6 +773,13 @@ async function loadSessions(){
     if (!r.ok) return;
     const data = await r.json();
     const list = data.sessions || [];
+
+    // Track active (ongoing) session for the live-chart button
+    const active = list.find(s => !s.ended_at);
+    window.activeSessionId = active ? active.id : null;
+    const liveBtn = document.getElementById('liveChartBtn');
+    if (liveBtn) liveBtn.classList.toggle('hidden', !window.activeSessionId);
+
     const el = document.getElementById('history');
     if (!list.length){
       el.innerText = 'No sessions yet.';
@@ -778,6 +792,10 @@ async function loadSessions(){
     const recent = list.slice(0, 10);
     el.innerHTML = recent.map(fmtSession).join('');
   }catch(e){}
+}
+
+function openLiveChart(){
+  if (window.activeSessionId) openChartModal(window.activeSessionId);
 }
 
 let lastUpdateTs = 0;
@@ -939,6 +957,7 @@ async function loadSettings(){
     pricePerKwh = settings.price_per_kwh;
     clockDiscountPercent = settings.clock_discount_percent ?? 20;
     batteryCapacity = settings.battery_capacity_kwh || 64;
+    window.batteryCapacity = batteryCapacity;
 
     const users = settings.users || ['Lidor', 'Bar'];
     availableUsers = users;

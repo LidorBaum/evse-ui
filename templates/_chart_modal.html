@@ -1,0 +1,303 @@
+  <!-- Session Chart Modal (shared partial) -->
+  <div id="chartModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 sm:p-6 w-full max-w-2xl shadow-xl">
+      <div class="flex justify-between items-center mb-3">
+        <div>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">📈 Charging Curve</h3>
+          <div id="chartMeta" class="text-xs text-gray-500 dark:text-gray-400 mt-1"></div>
+        </div>
+        <button onclick="closeChartModal()" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+      <div id="chartEmpty" class="hidden text-center text-gray-500 dark:text-gray-400 py-12">
+        <svg class="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M7 14l4-4 3 3 5-6"/></svg>
+        No samples for this session.
+        <div class="text-xs mt-1">Recorded before sampling enabled, or session was too short.</div>
+      </div>
+      <div class="relative h-72" id="chartWrap"><canvas id="sessionChart"></canvas></div>
+      <div id="chartLiveBadge" class="hidden mt-3 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+        <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
+        Live · updating every 5s
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // Session Chart Modal — shared logic for index.html and sessions.html.
+  // The host page must set window.batteryCapacity (kWh) before opening the modal.
+  let sessionChart = null;
+  let chartLiveTimer = null;
+  let chartCurrentSessionId = null;
+
+  function fmtChartDurationMins(mins) {
+    if (mins < 1) return Math.round(mins * 60) + 's';
+    if (mins < 60) return Math.round(mins) + 'm';
+    const h = Math.floor(mins / 60);
+    const m = Math.round(mins % 60);
+    return h + 'h ' + m + 'm';
+  }
+
+  async function openChartModal(sessionId) {
+    chartCurrentSessionId = sessionId;
+    document.getElementById('chartModal').classList.remove('hidden');
+    document.getElementById('chartEmpty').classList.add('hidden');
+    document.getElementById('chartWrap').style.display = '';
+    document.getElementById('chartMeta').textContent = 'Loading…';
+    document.getElementById('chartLiveBadge').classList.add('hidden');
+
+    await fetchAndRenderChart(sessionId, true);
+  }
+
+  function closeChartModal() {
+    document.getElementById('chartModal').classList.add('hidden');
+    if (chartLiveTimer) { clearInterval(chartLiveTimer); chartLiveTimer = null; }
+    if (sessionChart) { sessionChart.destroy(); sessionChart = null; }
+    chartCurrentSessionId = null;
+  }
+
+  async function fetchAndRenderChart(sessionId, firstLoad) {
+    try {
+      const r = await fetch('/api/session/' + sessionId + '/samples');
+      if (!r.ok) throw new Error('http ' + r.status);
+      const data = await r.json();
+      if (!data.ok) {
+        document.getElementById('chartMeta').textContent = data.error || 'Error';
+        return;
+      }
+      renderSessionChart(data, firstLoad);
+
+      if (data.ongoing && firstLoad) {
+        document.getElementById('chartLiveBadge').classList.remove('hidden');
+        if (chartLiveTimer) clearInterval(chartLiveTimer);
+        chartLiveTimer = setInterval(() => {
+          if (chartCurrentSessionId === sessionId) fetchAndRenderChart(sessionId, false);
+        }, 5000);
+      }
+    } catch (e) {
+      if (firstLoad) document.getElementById('chartMeta').textContent = 'Failed to load samples';
+    }
+  }
+
+  function renderSessionChart(data, firstLoad) {
+    const samples = data.samples || [];
+    const empty = samples.filter(s => s.kw != null).length === 0;
+    const wrap = document.getElementById('chartWrap');
+    const emptyEl = document.getElementById('chartEmpty');
+
+    if (empty) {
+      wrap.style.display = 'none';
+      emptyEl.classList.remove('hidden');
+      document.getElementById('chartMeta').textContent = '';
+      if (sessionChart) { sessionChart.destroy(); sessionChart = null; }
+      return;
+    }
+    wrap.style.display = '';
+    emptyEl.classList.add('hidden');
+
+    const battCap = (window.batteryCapacity && window.batteryCapacity > 0) ? window.batteryCapacity : 64;
+
+    const startTs = new Date(data.session.started_at).getTime();
+    const endTs = data.session.ended_at ? new Date(data.session.ended_at).getTime() : Date.now();
+    const durationMins = Math.max(0, (endTs - startTs) / 60000);
+    const kwhVals = samples.map(s => s.kwh).filter(v => v != null);
+    const kwhDelta = kwhVals.length >= 2 ? (kwhVals[kwhVals.length - 1] - kwhVals[0]) : 0;
+    const kwVals = samples.map(s => s.kw).filter(v => v != null);
+    const peakKw = kwVals.length ? Math.max(...kwVals) : 0;
+    const avgKw = kwVals.length ? (kwVals.reduce((a, b) => a + b, 0) / kwVals.length) : 0;
+    const battPctDelta = (kwhDelta / battCap) * 100;
+    document.getElementById('chartMeta').textContent =
+      `${fmtChartDurationMins(durationMins)} · +${battPctDelta.toFixed(1)}% battery · peak ${peakKw.toFixed(2)} kW · avg ${avgKw.toFixed(2)} kW`;
+
+    const kwhBase = kwhVals.length ? kwhVals[0] : 0;
+    const kwData = samples.map(s => ({ x: s.ts, y: s.kw }));
+
+    // Battery % from integrated power (smooth) — counter resolution is 0.1 kWh
+    // which would render as visible stair-steps at typical EV battery sizes.
+    // Final value still validated against counter delta in the meta line.
+    let cumKwh = 0;
+    let prevTs = null;
+    const battPctData = samples.map(s => {
+      const tsMs = s.ts ? new Date(s.ts).getTime() : null;
+      if (s.kw != null && prevTs != null && tsMs != null) {
+        cumKwh += s.kw * ((tsMs - prevTs) / 3600000);
+      }
+      if (tsMs != null && s.kw != null) prevTs = tsMs;
+      else if (s.kw == null) prevTs = null; // reset across reboot gap
+      return { x: s.ts, y: (cumKwh / battCap) * 100 };
+    });
+
+    // Same curve as battery %, but expressed as cumulative kWh.
+    // Drives a second left-side axis with kWh ticks.
+    const cumKwhData = battPctData.map(p => ({ x: p.x, y: (p.y * battCap) / 100 }));
+
+    const ampsData = samples.map(s => ({ x: s.ts, y: s.amps }));
+    const ampsRawVals = samples.map(s => s.amps);
+    const ampsChanged = (() => {
+      const seen = new Set(ampsRawVals.filter(a => a != null));
+      return seen.size > 1;
+    })();
+
+    const isDark = document.documentElement.classList.contains('dark');
+
+    if (sessionChart && !firstLoad) {
+      sessionChart.data.datasets[0].data = kwData;
+      sessionChart.data.datasets[1].data = battPctData;
+      sessionChart.data.datasets[2].data = cumKwhData;
+      if (sessionChart.data.datasets[3]) sessionChart.data.datasets[3].data = ampsData;
+      sessionChart.update('none');
+      return;
+    }
+
+    if (sessionChart) { sessionChart.destroy(); sessionChart = null; }
+
+    const datasets = [
+      {
+        label: 'Power (kW)',
+        data: kwData,
+        yAxisID: 'y',
+        borderColor: 'rgb(16, 185, 129)',
+        backgroundColor: 'rgba(16, 185, 129, 0.22)',
+        borderWidth: 2,
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        fill: true,
+        spanGaps: false,
+      },
+      {
+        label: 'Battery %',
+        data: battPctData,
+        yAxisID: 'y1',
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.0)',
+        borderWidth: 1.5,
+        borderDash: [4, 4],
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+        fill: false,
+        spanGaps: false,
+      },
+      {
+        // Invisible — exists only to drive the left-side kWh axis scale
+        // and enrich the tooltip with a kWh value alongside the %.
+        label: 'Cumulative kWh',
+        data: cumKwhData,
+        yAxisID: 'y3',
+        borderColor: 'rgba(0,0,0,0)',
+        backgroundColor: 'rgba(0,0,0,0)',
+        borderWidth: 0,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: false,
+        spanGaps: false,
+      }
+    ];
+
+    if (ampsChanged) {
+      datasets.push({
+        label: 'Set amps',
+        data: ampsData,
+        yAxisID: 'y2',
+        borderColor: 'rgb(168, 85, 247)',
+        backgroundColor: 'rgba(168, 85, 247, 0.0)',
+        borderWidth: 1.5,
+        stepped: 'before',
+        pointRadius: 0,
+        pointHoverRadius: 3,
+        fill: false,
+        spanGaps: true,
+      });
+    }
+
+    const ctx = document.getElementById('sessionChart').getContext('2d');
+    sessionChart = new Chart(ctx, {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              boxWidth: 12,
+              font: { size: 11 },
+              color: isDark ? '#d1d5db' : '#4b5563',
+              filter: (item) => item.text !== 'Cumulative kWh',
+            }
+          },
+          tooltip: {
+            backgroundColor: isDark ? '#374151' : '#fff',
+            titleColor: isDark ? '#fff' : '#111827',
+            bodyColor: isDark ? '#d1d5db' : '#4b5563',
+            borderColor: isDark ? '#4b5563' : '#e5e7eb',
+            borderWidth: 1,
+            padding: 12,
+            cornerRadius: 8,
+            callbacks: {
+              label: function(ctx) {
+                const v = ctx.parsed && ctx.parsed.y;
+                if (v == null) return ctx.dataset.label + ': —';
+                if (ctx.dataset.label === 'Power (kW)') return 'Power: ' + v.toFixed(2) + ' kW';
+                if (ctx.dataset.label === 'Battery %') return '+' + v.toFixed(1) + '% battery';
+                if (ctx.dataset.label === 'Cumulative kWh') return '+' + v.toFixed(2) + ' kWh';
+                if (ctx.dataset.label === 'Set amps') return v + ' A';
+                return ctx.dataset.label + ': ' + v;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              tooltipFormat: 'HH:mm:ss',
+              displayFormats: {
+                second: 'HH:mm:ss',
+                minute: 'HH:mm',
+                hour: 'HH:mm',
+                day: 'MMM d',
+              }
+            },
+            grid: { display: false },
+            ticks: {
+              color: isDark ? '#9ca3af' : '#6b7280',
+              maxRotation: 0,
+              autoSkip: true,
+              autoSkipPadding: 12,
+              source: 'auto',
+            }
+          },
+          y: {
+            position: 'left',
+            beginAtZero: true,
+            grid: { color: isDark ? '#374151' : '#f3f4f6' },
+            ticks: { color: isDark ? '#9ca3af' : '#6b7280', callback: v => v + ' kW' }
+          },
+          y3: {
+            position: 'left',
+            beginAtZero: true,
+            grid: { display: false },
+            ticks: {
+              color: 'rgb(59, 130, 246)',
+              callback: v => v.toFixed(1) + ' kWh',
+              maxTicksLimit: 6,
+            }
+          },
+          y1: {
+            position: 'right',
+            beginAtZero: true,
+            grid: { display: false },
+            ticks: { color: isDark ? '#9ca3af' : '#6b7280', callback: v => v + '%' }
+          },
+          y2: {
+            display: false,
+            beginAtZero: true,
+          }
+        }
+      }
+    });
+  }
+  </script>
