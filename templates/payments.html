@@ -311,9 +311,14 @@ function render() {
       </tr>`;
     }).join('');
 
+    const unpaidIds = list.filter(s => !(s.meta || {}).neighbor_paid).map(s => s.id);
+    const allSelected = unpaidIds.length > 0 && unpaidIds.every(id => selected.has(id));
+    const someSelected = unpaidIds.some(id => selected.has(id)) && !allSelected;
+    const selectAllAttrs = `${allSelected ? 'checked' : ''} ${someSelected ? 'data-indeterminate="1"' : ''}`;
+
     return `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-      <button onclick="toggleGroup('${user.replace(/'/g, "\\'")}')" class="w-full px-5 py-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
-        <div class="flex items-center gap-3">
+      <div class="w-full px-5 py-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+        <div class="flex items-center gap-3 flex-1 cursor-pointer" onclick="toggleGroup('${user.replace(/'/g, "\\'")}')">
           <svg class="w-4 h-4 text-gray-400 transform transition-transform ${isExpanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
           <span class="font-semibold text-gray-900 dark:text-white">${user}</span>
           <span class="text-xs text-gray-500 dark:text-gray-400">${list.length} sessions · ${kwhTotal.toFixed(1)} kWh</span>
@@ -321,9 +326,13 @@ function render() {
         <div class="flex items-center gap-3 text-sm">
           ${unpaidCount > 0 ? `<span class="text-amber-600 dark:text-amber-400 font-semibold">₪${outstanding.toFixed(2)} unpaid</span>` : ''}
           ${paidCount > 0 ? `<span class="text-emerald-600 dark:text-emerald-400">₪${paidTotal.toFixed(2)} paid</span>` : ''}
-          <span onclick="event.stopPropagation(); copySummary('${user.replace(/'/g, "\\'")}', ${list.length}, ${kwhTotal.toFixed(2)}, ${outstanding.toFixed(2)}, ${paidTotal.toFixed(2)})" class="text-xs text-gray-400 dark:text-gray-500 hover:text-emerald-500 cursor-pointer underline" title="Copy summary">📋</span>
+          <span onclick="copySummary('${user.replace(/'/g, "\\'")}', ${list.length}, ${kwhTotal.toFixed(2)}, ${outstanding.toFixed(2)}, ${paidTotal.toFixed(2)})" class="text-xs text-gray-400 dark:text-gray-500 hover:text-emerald-500 cursor-pointer underline" title="Copy summary">📋</span>
+          ${unpaidIds.length > 0 ? `<label class="flex items-center gap-1.5 cursor-pointer select-none text-xs text-gray-600 dark:text-gray-400" title="Select all unpaid">
+            <input type="checkbox" ${selectAllAttrs} onchange="selectAllUnpaid('${user.replace(/'/g, "\\'")}', this.checked)" class="group-select rounded border-gray-300 dark:border-gray-600 text-emerald-500 focus:ring-emerald-500" />
+            all unpaid
+          </label>` : ''}
         </div>
-      </button>
+      </div>
       ${isExpanded ? `<div class="overflow-x-auto border-t border-gray-100 dark:border-gray-700">
         <table class="w-full text-sm">
           <thead class="bg-gray-50 dark:bg-gray-700/40 text-xs uppercase text-gray-500 dark:text-gray-400">
@@ -343,7 +352,23 @@ function render() {
     </div>`;
   }).join('');
 
+  // Apply indeterminate state for partial selections
+  document.querySelectorAll('.group-select').forEach(el => {
+    el.indeterminate = el.dataset.indeterminate === '1';
+  });
+
   updateBulkBar();
+}
+
+function selectAllUnpaid(user, checked) {
+  allSessions.forEach(s => {
+    const m = s.meta || {};
+    if ((m.user || 'Unknown') !== user) return;
+    if (m.neighbor_paid) return;
+    if (checked) selected.add(s.id);
+    else selected.delete(s.id);
+  });
+  render();
 }
 
 function toggleGroup(user) {
