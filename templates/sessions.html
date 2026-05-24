@@ -261,9 +261,9 @@ async function openNeighborModal(sessionId) {
     await ensureNeighborRates();
     const rate = neighborRateByUser && neighborRateByUser[user];
     if (rate != null && energyVal > 0) {
-      price = +(rate * energyVal).toFixed(2);
+      price = Math.ceil(rate * energyVal);
     } else {
-      price = +systemCost.toFixed(2);
+      price = Math.ceil(systemCost);
     }
   }
   document.getElementById('neighborPrice').value = price;

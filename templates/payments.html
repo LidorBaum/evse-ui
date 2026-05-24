@@ -462,7 +462,7 @@ async function openNeighborModal(sessionId) {
   } else {
     await ensureNeighborRates();
     const rate = neighborRateByUser && neighborRateByUser[user];
-    price = (rate != null && energyVal > 0) ? +(rate * energyVal).toFixed(2) : +systemCost.toFixed(2);
+    price = (rate != null && energyVal > 0) ? Math.ceil(rate * energyVal) : Math.ceil(systemCost);
   }
   document.getElementById('neighborPrice').value = price;
   document.getElementById('neighborPaid').checked = !!meta.neighbor_paid;
