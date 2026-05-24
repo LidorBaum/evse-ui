@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💸</text></svg>">
+  <title>Payments - MG4 Charger</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
+  <script>
+    if (localStorage.getItem('darkMode') !== 'false') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    button {
+      transition: transform 0.1s ease, opacity 0.1s ease, background-color 0.15s ease;
+    }
+    button:active:not(:disabled) {
+      transform: scale(0.97);
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
+  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors pt-[env(safe-area-inset-top)]">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+      <h1 class="text-xl font-semibold text-gray-900 dark:text-white">💸 Payments</h1>
+      <div class="flex items-center gap-3">
+        <button onclick="location.href='/sessions'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">📋 Sessions</button>
+        <button onclick="location.href='/'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">← Back</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="loadingState" class="flex items-center justify-center py-20">
+    <div class="text-center text-gray-500 dark:text-gray-400">
+      <svg class="w-8 h-8 mb-2 mx-auto animate-spin text-emerald-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+      <div>Loading payments...</div>
+    </div>
+  </div>
+
+  <main id="contentArea" class="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto pb-32" style="display:none;">
+    <div class="grid grid-cols-3 gap-3 mb-4">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-center">
+        <div id="cardOutstanding" class="text-2xl font-bold text-amber-600 dark:text-amber-400">₪0</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Outstanding</div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-center">
+        <div id="cardReceived" class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₪0</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Received</div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-center">
+        <div id="cardAllTime" class="text-2xl font-bold text-gray-700 dark:text-gray-200">₪0</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">All Time</div>
+      </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm mb-4 flex flex-wrap gap-3 items-center">
+      <select id="userFilter" onchange="render()" class="text-sm rounded-lg border border-gray-300 dark:border-gray-600 py-2 pl-3 pr-8 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500">
+        <option value="">All Neighbours</option>
+      </select>
+      <div class="inline-flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+        <button onclick="setStatus('all')" id="stAll" class="text-xs px-3 py-2 bg-emerald-500 text-white">All</button>
+        <button onclick="setStatus('unpaid')" id="stUnpaid" class="text-xs px-3 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300">Unpaid</button>
+        <button onclick="setStatus('paid')" id="stPaid" class="text-xs px-3 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300">Paid</button>
+      </div>
+      <input type="month" id="monthFilter" onchange="render()" class="text-sm rounded-lg border border-gray-300 dark:border-gray-600 py-2 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
+      <button onclick="clearMonth()" class="text-xs text-gray-500 dark:text-gray-400 underline">clear month</button>
+    </div>
+
+    <div id="emptyState" class="hidden bg-white dark:bg-gray-800 rounded-xl p-10 shadow-sm text-center text-gray-500 dark:text-gray-400">
+      No sessions match these filters. Set a neighbour price on a session from the Sessions page to start tracking.
+    </div>
+
+    <div id="groupsContainer" class="space-y-3"></div>
+  </main>
+
+  <div id="bulkBar" class="hidden fixed bottom-0 inset-x-0 z-20 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg pb-[env(safe-area-inset-bottom)]">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
+      <div class="text-sm text-gray-700 dark:text-gray-300"><span id="bulkCount">0</span> selected · <span id="bulkTotal">₪0</span></div>
+      <input type="text" id="bulkNote" placeholder="Payment note (optional)"
+        class="flex-1 min-w-[150px] rounded-lg border border-gray-300 dark:border-gray-600 py-2 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm" />
+      <button onclick="clearSelection()" class="text-sm px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
+      <button onclick="bulkMarkPaid()" class="text-sm px-4 py-2 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">Mark Paid</button>
+    </div>
+  </div>
+
+  <!-- Neighbour Payment Modal (same as sessions.html) -->
+  <div id="neighborModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-xl">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">💸 Neighbour Payment</h3>
+      <div id="neighborMeta" class="text-xs text-gray-500 dark:text-gray-400 mb-4"></div>
+      <input type="hidden" id="neighborSessionId" />
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price (₪)</label>
+      <input type="number" id="neighborPrice" step="0.01" min="0" placeholder="0.00"
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm mb-3" />
+      <label class="flex items-center gap-2 mb-3 cursor-pointer select-none">
+        <input type="checkbox" id="neighborPaid" class="rounded border-gray-300 dark:border-gray-600 text-emerald-500 focus:ring-emerald-500" />
+        <span class="text-sm text-gray-700 dark:text-gray-300">Paid</span>
+      </label>
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment note <span class="text-gray-400">(optional)</span></label>
+      <input type="text" id="neighborPaymentNote" placeholder="e.g., Bit, Cash, Bank transfer"
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm mb-4" />
+      <div class="flex gap-3">
+        <button onclick="closeNeighborModal()" class="flex-1 py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
+        <button onclick="saveNeighbor()" class="flex-1 py-2 px-4 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">Save</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+let allSessions = [];          // sessions with neighbor_price != null
+let groups = [];               // summary groups from /api/payments/summary
+let totals = {outstanding:0, received:0, all_time:0};
+let pricePerKwh = 0.64;
+let clockDiscountPercent = 20;
+let clockSettings = { clock_start: '23:00', clock_end: '07:00' };
+let statusFilter = 'all';
+let selected = new Set();
+let expanded = new Set();
+
+function fmtDate(isoStr){
+  if (!isoStr) return '?';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleString('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit'
+    });
+  } catch(e) { return isoStr; }
+}
+
+function getSessionEnergy(s) {
+  if (s.session_energy_kwh != null) return s.session_energy_kwh;
+  if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
+    return s.end_amount_kwh - s.start_amount_kwh;
+  }
+  return 0;
+}
+
+function isMinuteInClock(minute) {
+  const [sh, sm] = clockSettings.clock_start.split(':').map(Number);
+  const [eh, em] = clockSettings.clock_end.split(':').map(Number);
+  const sM = sh * 60 + sm, eM = eh * 60 + em;
+  if (sM <= eM) return minute >= sM && minute < eM;
+  return minute >= sM || minute < eM;
+}
+
+function calcSessionCost(energyVal, startedAt, endedAt) {
+  if (!energyVal || energyVal <= 0) return 0;
+  if (!startedAt || !endedAt) return energyVal * pricePerKwh;
+  const start = new Date(startedAt);
+  const end = new Date(endedAt);
+  const totalMins = Math.max(1, Math.round((end - start) / 60000));
+  let clockMins = 0;
+  const step = Math.max(1, Math.floor(totalMins / 100));
+  for (let i = 0; i < totalMins; i += step) {
+    const t = new Date(start.getTime() + i * 60000);
+    const jt = new Date(t.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+    const mod = jt.getHours() * 60 + jt.getMinutes();
+    if (isMinuteInClock(mod)) clockMins += step;
+  }
+  clockMins = Math.min(clockMins, totalMins);
+  const nonClockMins = totalMins - clockMins;
+  const clockEnergy = energyVal * (clockMins / totalMins);
+  const nonClockEnergy = energyVal * (nonClockMins / totalMins);
+  const mult = 1 - (clockDiscountPercent / 100);
+  return clockEnergy * pricePerKwh * mult + nonClockEnergy * pricePerKwh;
+}
+
+function getMonthKey(isoStr) {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  const jt = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+  return jt.getFullYear() + '-' + String(jt.getMonth() + 1).padStart(2, '0');
+}
+
+async function load() {
+  try {
+    const [setRes, sumRes, sessRes] = await Promise.all([
+      fetch('/api/settings'),
+      fetch('/api/payments/summary'),
+      fetch('/api/sessions?page=1&page_size=2000'),
+    ]);
+    if (setRes.ok) {
+      const s = await setRes.json();
+      pricePerKwh = s.price_per_kwh ?? 0.64;
+      clockDiscountPercent = s.clock_discount_percent ?? 20;
+      clockSettings.clock_start = s.clock_start || '23:00';
+      clockSettings.clock_end = s.clock_end || '07:00';
+    }
+    if (sumRes.ok) {
+      const data = await sumRes.json();
+      groups = data.groups || [];
+      totals = data.totals || {outstanding:0, received:0, all_time:0};
+    }
+    if (sessRes.ok) {
+      const data = await sessRes.json();
+      allSessions = (data.sessions || []).filter(s => {
+        const m = s.meta || {};
+        return m.neighbor_price != null && s.ended_at;
+      });
+    }
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('contentArea').style.display = 'block';
+    populateUserFilter();
+    render();
+  } catch(e) {
+    document.getElementById('loadingState').innerHTML = '<div class="text-center text-red-500">❌ Failed to load payments.</div>';
+  }
+}
+
+function populateUserFilter() {
+  const select = document.getElementById('userFilter');
+  const users = groups.map(g => g.user);
+  select.innerHTML = '<option value="">All Neighbours</option>' +
+    users.map(u => `<option value="${u}">${u}</option>`).join('');
+}
+
+function setStatus(s) {
+  statusFilter = s;
+  ['all', 'unpaid', 'paid'].forEach(k => {
+    const btn = document.getElementById('st' + k.charAt(0).toUpperCase() + k.slice(1));
+    if (k === s) btn.className = 'text-xs px-3 py-2 bg-emerald-500 text-white';
+    else btn.className = 'text-xs px-3 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300';
+  });
+  render();
+}
+
+function clearMonth() {
+  document.getElementById('monthFilter').value = '';
+  render();
+}
+
+function filteredSessions() {
+  const userF = document.getElementById('userFilter').value;
+  const monthF = document.getElementById('monthFilter').value;
+  return allSessions.filter(s => {
+    const m = s.meta || {};
+    if (userF && (m.user || 'Unknown') !== userF) return false;
+    if (statusFilter === 'paid' && !m.neighbor_paid) return false;
+    if (statusFilter === 'unpaid' && m.neighbor_paid) return false;
+    if (monthF && getMonthKey(s.started_at) !== monthF) return false;
+    return true;
+  });
+}
+
+function render() {
+  // Update top cards from server totals (don't change with filters — those are global)
+  document.getElementById('cardOutstanding').textContent = '₪' + (totals.outstanding || 0).toFixed(2);
+  document.getElementById('cardReceived').textContent = '₪' + (totals.received || 0).toFixed(2);
+  document.getElementById('cardAllTime').textContent = '₪' + (totals.all_time || 0).toFixed(2);
+
+  const sessions = filteredSessions();
+  const container = document.getElementById('groupsContainer');
+  const empty = document.getElementById('emptyState');
+
+  if (!sessions.length) {
+    container.innerHTML = '';
+    empty.classList.remove('hidden');
+    updateBulkBar();
+    return;
+  }
+  empty.classList.add('hidden');
+
+  // Group by user
+  const byUser = {};
+  sessions.forEach(s => {
+    const u = (s.meta || {}).user || 'Unknown';
+    (byUser[u] = byUser[u] || []).push(s);
+  });
+
+  const userKeys = Object.keys(byUser).sort();
+  container.innerHTML = userKeys.map(user => {
+    const list = byUser[user].slice().sort((a, b) => (b.started_at || '').localeCompare(a.started_at || ''));
+    let outstanding = 0, paidTotal = 0, unpaidCount = 0, paidCount = 0, kwhTotal = 0;
+    list.forEach(s => {
+      const m = s.meta || {};
+      const price = Number(m.neighbor_price) || 0;
+      kwhTotal += getSessionEnergy(s);
+      if (m.neighbor_paid) { paidTotal += price; paidCount++; }
+      else { outstanding += price; unpaidCount++; }
+    });
+    const isExpanded = expanded.has(user);
+
+    const rows = list.map(s => {
+      const m = s.meta || {};
+      const energyVal = getSessionEnergy(s);
+      const systemCost = calcSessionCost(energyVal, s.started_at, s.ended_at);
+      const paid = !!m.neighbor_paid;
+      const price = Number(m.neighbor_price) || 0;
+      const note = m.neighbor_payment_note || '';
+      const checked = selected.has(s.id) ? 'checked' : '';
+      const canSelect = !paid;
+      return `<tr class="border-b border-gray-100 dark:border-gray-700 last:border-0">
+        <td class="py-2 pl-2 pr-1">${canSelect ? `<input type="checkbox" data-sid="${s.id}" ${checked} onchange="toggleSelect('${s.id}', this.checked)" class="rounded border-gray-300 dark:border-gray-600 text-emerald-500 focus:ring-emerald-500" />` : ''}</td>
+        <td class="py-2 px-2 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">${fmtDate(s.started_at)}</td>
+        <td class="py-2 px-2 text-sm text-gray-600 dark:text-gray-400 text-right">${energyVal.toFixed(1)} kWh</td>
+        <td class="py-2 px-2 text-sm text-gray-500 dark:text-gray-400 text-right">₪${systemCost.toFixed(2)}</td>
+        <td class="py-2 px-2 text-sm text-right">
+          <button onclick="openNeighborModal('${s.id}')" class="font-semibold ${paid ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'} hover:underline">₪${price.toFixed(2)}</button>
+        </td>
+        <td class="py-2 px-2 text-xs text-gray-500 dark:text-gray-400 max-w-[120px] truncate" title="${note}">${note}</td>
+        <td class="py-2 pl-1 pr-2 text-sm text-right">
+          <button onclick="togglePaid('${s.id}', ${!paid})" class="text-xs px-2 py-1 rounded-md ${paid ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'}">${paid ? '✓ paid' : 'unpaid'}</button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+      <button onclick="toggleGroup('${user.replace(/'/g, "\\'")}')" class="w-full px-5 py-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+        <div class="flex items-center gap-3">
+          <svg class="w-4 h-4 text-gray-400 transform transition-transform ${isExpanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          <span class="font-semibold text-gray-900 dark:text-white">${user}</span>
+          <span class="text-xs text-gray-500 dark:text-gray-400">${list.length} sessions · ${kwhTotal.toFixed(1)} kWh</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm">
+          ${unpaidCount > 0 ? `<span class="text-amber-600 dark:text-amber-400 font-semibold">₪${outstanding.toFixed(2)} unpaid</span>` : ''}
+          ${paidCount > 0 ? `<span class="text-emerald-600 dark:text-emerald-400">₪${paidTotal.toFixed(2)} paid</span>` : ''}
+          <span onclick="event.stopPropagation(); copySummary('${user.replace(/'/g, "\\'")}', ${list.length}, ${kwhTotal.toFixed(2)}, ${outstanding.toFixed(2)}, ${paidTotal.toFixed(2)})" class="text-xs text-gray-400 dark:text-gray-500 hover:text-emerald-500 cursor-pointer underline" title="Copy summary">📋</span>
+        </div>
+      </button>
+      ${isExpanded ? `<div class="overflow-x-auto border-t border-gray-100 dark:border-gray-700">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 dark:bg-gray-700/40 text-xs uppercase text-gray-500 dark:text-gray-400">
+            <tr>
+              <th class="py-2 pl-2 pr-1 text-left"></th>
+              <th class="py-2 px-2 text-left">Date</th>
+              <th class="py-2 px-2 text-right">kWh</th>
+              <th class="py-2 px-2 text-right">System ₪</th>
+              <th class="py-2 px-2 text-right">Neighbour ₪</th>
+              <th class="py-2 px-2 text-left">Note</th>
+              <th class="py-2 pl-1 pr-2 text-right">Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  updateBulkBar();
+}
+
+function toggleGroup(user) {
+  if (expanded.has(user)) expanded.delete(user);
+  else expanded.add(user);
+  render();
+}
+
+function toggleSelect(sid, checked) {
+  if (checked) selected.add(sid);
+  else selected.delete(sid);
+  updateBulkBar();
+}
+
+function clearSelection() {
+  selected.clear();
+  render();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  const n = selected.size;
+  if (!n) { bar.classList.add('hidden'); return; }
+  bar.classList.remove('hidden');
+  let sum = 0;
+  selected.forEach(sid => {
+    const s = allSessions.find(x => x.id === sid);
+    if (s) sum += Number((s.meta || {}).neighbor_price) || 0;
+  });
+  document.getElementById('bulkCount').textContent = n;
+  document.getElementById('bulkTotal').textContent = '₪' + sum.toFixed(2);
+}
+
+async function bulkMarkPaid() {
+  if (!selected.size) return;
+  const ids = Array.from(selected);
+  const note = document.getElementById('bulkNote').value.trim();
+  if (!confirm('Mark ' + ids.length + ' session(s) as paid?')) return;
+  try {
+    const r = await fetch('/api/payments/bulk-paid', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ session_ids: ids, payment_note: note })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      selected.clear();
+      document.getElementById('bulkNote').value = '';
+      load();
+    } else {
+      alert(data.error || 'Failed');
+    }
+  } catch(e) {
+    alert('Failed: ' + e.message);
+  }
+}
+
+async function togglePaid(sid, newPaid) {
+  const s = allSessions.find(x => x.id === sid);
+  if (!s) return;
+  const m = s.meta || {};
+  try {
+    const r = await fetch('/api/session/' + sid + '/neighbor', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        price: m.neighbor_price,
+        paid: newPaid,
+        payment_note: m.neighbor_payment_note || '',
+      })
+    });
+    if (r.ok) load();
+  } catch(e) {}
+}
+
+function copySummary(user, count, kwh, outstanding, paid) {
+  const lines = [
+    `${user} — neighbour payment summary`,
+    `Sessions: ${count}`,
+    `Total energy: ${kwh} kWh`,
+    `Outstanding: ₪${outstanding}`,
+    `Paid: ₪${paid}`,
+  ];
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Summary copied to clipboard');
+  }).catch(() => {
+    prompt('Copy manually:', text);
+  });
+}
+
+// Neighbour modal — same behaviour as sessions.html
+let neighborRateByUser = null;
+async function ensureNeighborRates() {
+  if (neighborRateByUser !== null) return;
+  const map = {};
+  groups.forEach(g => { if (g.last_rate_per_kwh != null) map[g.user] = g.last_rate_per_kwh; });
+  neighborRateByUser = map;
+}
+
+async function openNeighborModal(sessionId) {
+  const s = allSessions.find(x => x.id === sessionId);
+  if (!s) return;
+  const meta = s.meta || {};
+  const energyVal = getSessionEnergy(s);
+  const systemCost = calcSessionCost(energyVal, s.started_at, s.ended_at);
+  const user = meta.user || 'Unknown';
+
+  document.getElementById('neighborSessionId').value = sessionId;
+  document.getElementById('neighborMeta').textContent =
+    `${user} · ${energyVal.toFixed(1)} kWh · system cost ₪${systemCost.toFixed(2)}`;
+
+  let price;
+  if (meta.neighbor_price != null) {
+    price = meta.neighbor_price;
+  } else {
+    await ensureNeighborRates();
+    const rate = neighborRateByUser && neighborRateByUser[user];
+    price = (rate != null && energyVal > 0) ? +(rate * energyVal).toFixed(2) : +systemCost.toFixed(2);
+  }
+  document.getElementById('neighborPrice').value = price;
+  document.getElementById('neighborPaid').checked = !!meta.neighbor_paid;
+  document.getElementById('neighborPaymentNote').value = meta.neighbor_payment_note || '';
+  document.getElementById('neighborModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('neighborPrice').focus(), 50);
+}
+
+function closeNeighborModal() {
+  document.getElementById('neighborModal').classList.add('hidden');
+}
+
+async function saveNeighbor() {
+  const sid = document.getElementById('neighborSessionId').value;
+  const priceRaw = document.getElementById('neighborPrice').value;
+  if (priceRaw === '' || isNaN(parseFloat(priceRaw))) {
+    alert('Enter a valid price');
+    return;
+  }
+  const body = {
+    price: parseFloat(priceRaw),
+    paid: document.getElementById('neighborPaid').checked,
+    payment_note: document.getElementById('neighborPaymentNote').value.trim(),
+  };
+  try {
+    const r = await fetch('/api/session/' + sid + '/neighbor', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    if (data.ok) {
+      neighborRateByUser = null;
+      closeNeighborModal();
+      load();
+    } else {
+      alert(data.error || 'Failed to save');
+    }
+  } catch(e) {
+    alert('Failed to save: ' + e.message);
+  }
+}
+
+load();
+</script>
+</body>
+</html>

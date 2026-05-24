@@ -37,6 +37,7 @@
         <select id="userFilter" onchange="applyFilter()" class="text-sm rounded-lg border border-gray-300 dark:border-gray-600 py-2 pl-3 pr-8 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500">
           <option value="">All Users</option>
         </select>
+        <button onclick="location.href='/payments'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">💸 Payments</button>
         <button onclick="location.href='/'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">← Back</button>
       </div>
     </div>
@@ -99,6 +100,29 @@
       <div class="flex gap-3 mt-4">
         <button onclick="closeNoteModal()" class="flex-1 py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
         <button onclick="saveNote()" class="flex-1 py-2 px-4 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Neighbour Payment Modal -->
+  <div id="neighborModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-xl">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">💸 Neighbour Payment</h3>
+      <div id="neighborMeta" class="text-xs text-gray-500 dark:text-gray-400 mb-4"></div>
+      <input type="hidden" id="neighborSessionId" />
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price (₪)</label>
+      <input type="number" id="neighborPrice" step="0.01" min="0" placeholder="0.00"
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm mb-3" />
+      <label class="flex items-center gap-2 mb-3 cursor-pointer select-none">
+        <input type="checkbox" id="neighborPaid" class="rounded border-gray-300 dark:border-gray-600 text-emerald-500 focus:ring-emerald-500" />
+        <span class="text-sm text-gray-700 dark:text-gray-300">Paid</span>
+      </label>
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment note <span class="text-gray-400">(optional)</span></label>
+      <input type="text" id="neighborPaymentNote" placeholder="e.g., Bit, Cash, Bank transfer"
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm mb-4" />
+      <div class="flex gap-3">
+        <button onclick="closeNeighborModal()" class="flex-1 py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
+        <button onclick="saveNeighbor()" class="flex-1 py-2 px-4 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">Save</button>
       </div>
     </div>
   </div>
@@ -186,7 +210,7 @@ function closeNoteModal() {
 async function saveNote() {
   const sessionId = document.getElementById('noteSessionId').value;
   const note = document.getElementById('noteText').value.trim();
-  
+
   try {
     const r = await fetch('/api/session/' + sessionId + '/note', {
       method: 'POST',
@@ -199,6 +223,89 @@ async function saveNote() {
       loadSessions();
     }
   } catch(e) {}
+}
+
+// Cache of last-used neighbour rate per user (₪/kWh). Filled from /api/payments/summary lazily.
+let neighborRateByUser = null;
+
+async function ensureNeighborRates() {
+  if (neighborRateByUser !== null) return;
+  try {
+    const r = await fetch('/api/payments/summary');
+    if (!r.ok) { neighborRateByUser = {}; return; }
+    const data = await r.json();
+    const map = {};
+    (data.groups || []).forEach(g => {
+      if (g.last_rate_per_kwh != null) map[g.user] = g.last_rate_per_kwh;
+    });
+    neighborRateByUser = map;
+  } catch(e) { neighborRateByUser = {}; }
+}
+
+async function openNeighborModal(sessionId) {
+  const s = loadedSessions.find(x => x.id === sessionId);
+  if (!s) return;
+  const meta = s.meta || {};
+  const energyVal = getSessionEnergy(s);
+  const systemCost = calcSessionCost(energyVal, s.started_at, s.ended_at);
+  const user = meta.user || 'Unknown';
+
+  document.getElementById('neighborSessionId').value = sessionId;
+  document.getElementById('neighborMeta').textContent =
+    `${user} · ${energyVal.toFixed(1)} kWh · system cost ₪${systemCost.toFixed(2)}`;
+
+  let price;
+  if (meta.neighbor_price != null) {
+    price = meta.neighbor_price;
+  } else {
+    await ensureNeighborRates();
+    const rate = neighborRateByUser && neighborRateByUser[user];
+    if (rate != null && energyVal > 0) {
+      price = +(rate * energyVal).toFixed(2);
+    } else {
+      price = +systemCost.toFixed(2);
+    }
+  }
+  document.getElementById('neighborPrice').value = price;
+  document.getElementById('neighborPaid').checked = !!meta.neighbor_paid;
+  document.getElementById('neighborPaymentNote').value = meta.neighbor_payment_note || '';
+  document.getElementById('neighborModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('neighborPrice').focus(), 50);
+}
+
+function closeNeighborModal() {
+  document.getElementById('neighborModal').classList.add('hidden');
+}
+
+async function saveNeighbor() {
+  const sessionId = document.getElementById('neighborSessionId').value;
+  const priceRaw = document.getElementById('neighborPrice').value;
+  if (priceRaw === '' || isNaN(parseFloat(priceRaw))) {
+    alert('Enter a valid price');
+    return;
+  }
+  const body = {
+    price: parseFloat(priceRaw),
+    paid: document.getElementById('neighborPaid').checked,
+    payment_note: document.getElementById('neighborPaymentNote').value.trim(),
+  };
+  try {
+    const r = await fetch('/api/session/' + sessionId + '/neighbor', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    if (data.ok) {
+      neighborRateByUser = null;  // invalidate cache, rate may have changed
+      closeNeighborModal();
+      loadSessions();
+    } else {
+      alert(data.error || 'Failed to save');
+    }
+  } catch(e) {
+    alert('Failed to save: ' + e.message);
+  }
 }
 
 async function deleteSession(sessionId, energyLabel) {
@@ -738,6 +845,11 @@ function fmtSession(s){
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
   const note = (s.meta && s.meta.note) ? s.meta.note : '';
   const mergedFrom = (s.meta && s.meta.merged_from) ? s.meta.merged_from : null;
+  const neighborPrice = (s.meta && s.meta.neighbor_price != null) ? s.meta.neighbor_price : null;
+  const neighborPaid = !!(s.meta && s.meta.neighbor_paid);
+  const neighborPill = neighborPrice != null
+    ? `<span onclick="openNeighborModal('${s.id}')" class="cursor-pointer text-xs px-2 py-0.5 rounded-full font-medium ${neighborPaid ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'}" title="${neighborPaid ? 'Paid' : 'Unpaid'}">₪${Number(neighborPrice).toFixed(2)} ${neighborPaid ? '✓' : 'unpaid'}</span>`
+    : '';
 
   return `<div class="py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 flex items-center gap-3">
     <div class="flex-1">
@@ -749,6 +861,7 @@ function fmtSession(s){
         <span class="text-gray-600 dark:text-gray-400">${user}</span>
         ${ongoing ? '<span class="text-emerald-500 font-medium">🔌 Charging</span>' : ''}
         ${mergedFrom ? '<span class="text-xs text-purple-500 dark:text-purple-400">🔗 merged</span>' : ''}
+        ${neighborPill}
         ${note ? `<span class="text-gray-400 dark:text-gray-500">·</span><span class="text-amber-600 dark:text-amber-400 italic text-sm">${note}</span>` : ''}
       </div>
       <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">${start} → ${end}</div>
@@ -765,6 +878,7 @@ function fmtSession(s){
     <button onclick="openNoteModal('${s.id}', '${note.replace(/'/g, "\\'")}')" class="text-gray-400 dark:text-gray-500 hover:text-emerald-500 dark:hover:text-emerald-400 px-2 transition" title="${note || 'Add note'}">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
     </button>
+    ${!ongoing ? `<button onclick="openNeighborModal('${s.id}')" class="text-gray-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400 px-2 transition font-semibold text-sm" title="${neighborPrice != null ? 'Edit neighbour payment' : 'Set neighbour payment'}">₪</button>` : ''}
     ${!ongoing ? `<button onclick="deleteSession('${s.id}', '${energy}')" class="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 px-2 transition" title="Delete session">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
     </button>` : ''}

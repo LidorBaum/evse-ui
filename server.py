@@ -937,6 +937,137 @@ def api_session_user(session_id: str, body: dict):
     return {"ok": False, "error": "Session not found"}
 
 
+@app.post("/api/session/{session_id}/neighbor")
+def api_session_neighbor(session_id: str, body: dict):
+    """Set/update neighbour pricing and paid status on a session."""
+    price = body.get("price")
+    if price is None or price == "":
+        return {"ok": False, "error": "Price is required"}
+    try:
+        price = float(price)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "Invalid price"}
+    if price < 0:
+        return {"ok": False, "error": "Price cannot be negative"}
+
+    paid = bool(body.get("paid", False))
+    payment_note = (body.get("payment_note") or "").strip()
+
+    def _apply(s):
+        if "meta" not in s:
+            s["meta"] = {}
+        meta = s["meta"]
+        was_paid = bool(meta.get("neighbor_paid", False))
+        meta["neighbor_price"] = price
+        meta["neighbor_paid"] = paid
+        meta["neighbor_payment_note"] = payment_note
+        if paid and not was_paid:
+            meta["neighbor_paid_at"] = _utc_iso()
+        elif not paid:
+            meta["neighbor_paid_at"] = None
+
+    with _sessions_lock:
+        if current_session is not None and current_session.get("id") == session_id:
+            _apply(current_session)
+            _save_sessions()
+            return {"ok": True}
+        for s in sessions:
+            if s.get("id") == session_id:
+                _apply(s)
+                _save_sessions()
+                return {"ok": True}
+    return {"ok": False, "error": "Session not found"}
+
+
+@app.post("/api/payments/bulk-paid")
+def api_payments_bulk_paid(body: dict):
+    """Mark multiple sessions as paid in one call."""
+    session_ids = body.get("session_ids") or []
+    payment_note = (body.get("payment_note") or "").strip()
+    if not isinstance(session_ids, list) or not session_ids:
+        return {"ok": False, "error": "session_ids required"}
+
+    id_set = set(session_ids)
+    now = _utc_iso()
+    updated = 0
+
+    with _sessions_lock:
+        all_sessions = sessions + ([current_session] if current_session else [])
+        for s in all_sessions:
+            if s.get("id") not in id_set:
+                continue
+            meta = s.get("meta") or {}
+            if meta.get("neighbor_price") is None:
+                continue
+            s["meta"] = meta
+            meta["neighbor_paid"] = True
+            meta["neighbor_paid_at"] = now
+            if payment_note:
+                meta["neighbor_payment_note"] = payment_note
+            updated += 1
+        if updated:
+            _save_sessions()
+    return {"ok": True, "updated": updated}
+
+
+@app.get("/api/payments/summary")
+def api_payments_summary():
+    """Aggregate neighbour payment data per user."""
+    with _sessions_lock:
+        all_sessions = sessions[-MAX_SESSIONS:] + ([current_session] if current_session else [])
+        groups = {}  # user -> dict
+        outstanding_total = 0.0
+        received_total = 0.0
+
+        # Iterate oldest-to-newest so the last-seen entry per user wins for last_rate_per_kwh
+        for s in all_sessions:
+            meta = s.get("meta") or {}
+            price = meta.get("neighbor_price")
+            if price is None:
+                continue
+            user = meta.get("user", "Unknown")
+            paid = bool(meta.get("neighbor_paid", False))
+            energy = _get_session_energy(s)
+
+            g = groups.setdefault(user, {
+                "user": user,
+                "outstanding": 0.0,
+                "paid_total": 0.0,
+                "unpaid_count": 0,
+                "paid_count": 0,
+                "kwh_total": 0.0,
+                "last_rate_per_kwh": None,
+            })
+            g["kwh_total"] += energy
+            if paid:
+                g["paid_total"] += float(price)
+                g["paid_count"] += 1
+                received_total += float(price)
+            else:
+                g["outstanding"] += float(price)
+                g["unpaid_count"] += 1
+                outstanding_total += float(price)
+            if energy > 0:
+                g["last_rate_per_kwh"] = float(price) / energy
+
+        groups_list = sorted(groups.values(), key=lambda g: g["outstanding"], reverse=True)
+        for g in groups_list:
+            g["outstanding"] = round(g["outstanding"], 2)
+            g["paid_total"] = round(g["paid_total"], 2)
+            g["kwh_total"] = round(g["kwh_total"], 2)
+            if g["last_rate_per_kwh"] is not None:
+                g["last_rate_per_kwh"] = round(g["last_rate_per_kwh"], 4)
+
+        return {
+            "groups": groups_list,
+            "totals": {
+                "outstanding": round(outstanding_total, 2),
+                "received": round(received_total, 2),
+                "all_time": round(outstanding_total + received_total, 2),
+            }
+        }
+
+
 @app.get("/api/session/{session_id}/neighbors")
 def api_session_neighbors(session_id: str):
     """Find sessions that can be merged: same user AND combined window stays
@@ -1656,4 +1787,13 @@ def calculator_page(evse_auth: str | None = Cookie(default=None)):
     if redirect:
         return redirect
     html = _read_template("calculator.html")
+    return HTMLResponse(html)
+
+
+@app.get("/payments")
+def payments_page(evse_auth: str | None = Cookie(default=None)):
+    redirect = _check_auth(evse_auth)
+    if redirect:
+        return redirect
+    html = _read_template("payments.html")
     return HTMLResponse(html)
