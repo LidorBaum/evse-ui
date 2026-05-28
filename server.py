@@ -242,6 +242,17 @@ app_settings: dict = _load_settings()
 app = FastAPI()
 
 
+def _get_local_ip() -> str:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "unknown"
+    finally:
+        s.close()
+
+
 @app.on_event("startup")
 async def _notify_telegram_service_up():
     if not app_settings.get("telegram_notify_service_up", True):
@@ -249,9 +260,12 @@ async def _notify_telegram_service_up():
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
     host = html.escape(socket.gethostname())
+    local_ip = html.escape(_get_local_ip())
     _send_telegram(
         f"🟢 <b>System Up!</b>\n"
-        f"Service started (restart or reboot)."
+        f"Service started (restart or reboot).\n"
+        f"Host: <code>{host}</code>\n"
+        f"Local IP: <code>{local_ip}</code>"
     )
 
 
