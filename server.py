@@ -3,6 +3,7 @@ import html
 import json
 import os
 import secrets
+import shutil
 import socket
 import subprocess
 import threading
@@ -70,6 +71,15 @@ os.makedirs(SAMPLES_DIR, exist_ok=True)
 
 # ---- Settings config ----
 SETTINGS_FILE = os.getenv("SETTINGS_FILE", "settings.json")
+
+# ---- Neighbour payments ledger config ----
+PAYMENTS_FILE = os.getenv("PAYMENTS_FILE", "payments.json")
+# One-time pre-migration snapshot of sessions.json (belt-and-braces backup).
+# Lives beside the sessions file so it follows SESSIONS_FILE wherever it points.
+SESSIONS_PRE_MIGRATION_BACKUP = os.getenv(
+    "SESSIONS_PRE_MIGRATION_BACKUP",
+    os.path.join(os.path.dirname(SESSIONS_FILE) or ".", "sessions.pre-payments.json"),
+)
 
 # ---- Telegram notifications ----
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -365,6 +375,12 @@ sessions: list[dict] = []
 current_session: dict | None = None
 _sessions_lock = threading.Lock()
 
+# ---- Neighbour payments ledger (account-level, decoupled from sessions) ----
+# Each record: {"id", "user", "amount", "paid_at", "note"}
+payments: list[dict] = []
+_payments_lock = threading.Lock()
+_payment_id_counter = 0
+
 
 def _utc_iso() -> str:
     return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
@@ -433,6 +449,121 @@ def _save_sessions():
     except Exception:
         # If disk write fails, don't crash the bridge.
         pass
+
+
+# ----------------------------------------------------------------------------
+# Neighbour payments ledger
+# ----------------------------------------------------------------------------
+def _next_payment_id() -> str:
+    """Monotonic, timestamp-prefixed id (mirrors session id style)."""
+    global _payment_id_counter
+    _payment_id_counter += 1
+    return f"{int(time.time())}-{_payment_id_counter}"
+
+
+def _save_payments():
+    try:
+        tmp = PAYMENTS_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"payments": payments}, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, PAYMENTS_FILE)
+    except Exception:
+        pass
+
+
+def _migrate_payments_from_sessions() -> list[dict]:
+    """First-run migration: turn existing per-session `neighbor_paid` flags into
+    one opening payment per neighbour, so day-one balances/badges match today.
+    Read-only on sessions.json; takes a safety snapshot first."""
+    print("[Payments] No payments.json found — running first-time migration from sessions.", flush=True)
+    # Belt-and-braces: snapshot sessions.json before we build the ledger.
+    try:
+        if os.path.exists(SESSIONS_FILE) and not os.path.exists(SESSIONS_PRE_MIGRATION_BACKUP):
+            shutil.copy2(SESSIONS_FILE, SESSIONS_PRE_MIGRATION_BACKUP)
+            print(f"[Payments] Snapshot of sessions saved to {SESSIONS_PRE_MIGRATION_BACKUP}", flush=True)
+    except Exception as e:
+        print(f"[Payments] WARNING: could not snapshot sessions.json: {e}", flush=True)
+
+    paid_by_user: dict[str, float] = {}
+    all_sessions = sessions + ([current_session] if current_session else [])
+    for s in all_sessions:
+        meta = s.get("meta") or {}
+        price = meta.get("neighbor_price")
+        if price is None or not meta.get("neighbor_paid"):
+            continue
+        user = meta.get("user", "Unknown")
+        try:
+            paid_by_user[user] = paid_by_user.get(user, 0.0) + float(price)
+        except (TypeError, ValueError):
+            continue
+
+    out: list[dict] = []
+    now = _utc_iso()
+    for user, amount in paid_by_user.items():
+        if amount > 0:
+            out.append({
+                "id": _next_payment_id(),
+                "user": user,
+                "amount": round(amount, 2),
+                "paid_at": now,
+                "note": "opening balance (migrated)",
+            })
+    if out:
+        summary = ", ".join(f"{r['user']} ₪{r['amount']:g}" for r in out)
+        print(f"[Payments] Migration complete: {len(out)} opening payment(s) — {summary}.", flush=True)
+    else:
+        print("[Payments] Migration complete: no paid sessions found, starting empty ledger.", flush=True)
+    return out
+
+
+def _load_payments():
+    """Load the payments ledger. On first run (no file) migrate from sessions."""
+    global payments
+    if not os.path.exists(PAYMENTS_FILE):
+        payments = _migrate_payments_from_sessions()
+        _save_payments()
+        return
+    try:
+        with open(PAYMENTS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            payments = data.get("payments") or []
+        elif isinstance(data, list):
+            payments = data
+        else:
+            payments = []
+        print(f"[Payments] Loaded {len(payments)} payment record(s) from {PAYMENTS_FILE}.", flush=True)
+    except Exception:
+        payments = []
+
+
+def _user_charges(user: str) -> float:
+    """Sum of neighbour_price across a user's priced sessions (the debits)."""
+    with _sessions_lock:
+        snapshot = sessions[-MAX_SESSIONS:] + ([current_session] if current_session else [])
+    total = 0.0
+    for s in snapshot:
+        meta = s.get("meta") or {}
+        price = meta.get("neighbor_price")
+        if price is None or meta.get("user", "Unknown") != user:
+            continue
+        try:
+            total += float(price)
+        except (TypeError, ValueError):
+            continue
+    return total
+
+
+def _user_payments_total(user: str) -> float:
+    with _payments_lock:
+        return sum(
+            float(p.get("amount", 0) or 0) for p in payments if p.get("user") == user
+        )
+
+
+def _user_balance(user: str) -> float:
+    """Positive => owes (debit). Negative => credit (prepaid)."""
+    return _user_charges(user) - _user_payments_total(user)
 
 
 # ---- Per-session sample helpers (NDJSON, one file per session) ----
@@ -743,6 +874,7 @@ def on_message(client, userdata, msg):
 
 
 _load_sessions()
+_load_payments()  # must follow _load_sessions (first-run migration reads sessions)
 
 mqttc = mqtt.Client()
 mqttc.on_connect = on_connect
@@ -953,7 +1085,11 @@ def api_session_user(session_id: str, body: dict):
 
 @app.post("/api/session/{session_id}/neighbor")
 def api_session_neighbor(session_id: str, body: dict):
-    """Set/update neighbour pricing and paid status on a session."""
+    """Set/update the neighbour *charge price* on a session.
+
+    Payment state lives in the payments ledger now (FIFO-allocated), so this no
+    longer touches `neighbor_paid` — it only records what the session costs the
+    neighbour."""
     price = body.get("price")
     if price is None or price == "":
         return {"ok": False, "error": "Price is required"}
@@ -964,21 +1100,10 @@ def api_session_neighbor(session_id: str, body: dict):
     if price < 0:
         return {"ok": False, "error": "Price cannot be negative"}
 
-    paid = bool(body.get("paid", False))
-    payment_note = (body.get("payment_note") or "").strip()
-
     def _apply(s):
         if "meta" not in s:
             s["meta"] = {}
-        meta = s["meta"]
-        was_paid = bool(meta.get("neighbor_paid", False))
-        meta["neighbor_price"] = price
-        meta["neighbor_paid"] = paid
-        meta["neighbor_payment_note"] = payment_note
-        if paid and not was_paid:
-            meta["neighbor_paid_at"] = _utc_iso()
-        elif not paid:
-            meta["neighbor_paid_at"] = None
+        s["meta"]["neighbor_price"] = price
 
     with _sessions_lock:
         if current_session is not None and current_session.get("id") == session_id:
@@ -993,93 +1118,193 @@ def api_session_neighbor(session_id: str, body: dict):
     return {"ok": False, "error": "Session not found"}
 
 
+@app.post("/api/payments")
+def api_payments_add(body: dict):
+    """Record a payment a neighbour made (any amount, against their balance)."""
+    user = (body.get("user") or "").strip()
+    if not user:
+        return {"ok": False, "error": "user required"}
+    try:
+        amount = float(body.get("amount"))
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "Invalid amount"}
+    if amount <= 0:
+        return {"ok": False, "error": "Amount must be positive"}
+    note = (body.get("note") or "").strip()
+    paid_at = (body.get("paid_at") or "").strip() or _utc_iso()
+
+    rec = {
+        "id": _next_payment_id(),
+        "user": user,
+        "amount": round(amount, 2),
+        "paid_at": paid_at,
+        "note": note,
+    }
+    with _payments_lock:
+        payments.append(rec)
+        _save_payments()
+    # Balance computed after releasing the lock (helpers take _payments_lock).
+    return {"ok": True, "payment": rec, "balance": round(_user_balance(user), 2)}
+
+
+@app.patch("/api/payments/{payment_id}")
+def api_payments_update(payment_id: str, body: dict):
+    """Edit a payment (fix a typo in amount/note/date)."""
+    with _payments_lock:
+        rec = next((p for p in payments if p.get("id") == payment_id), None)
+        if rec is None:
+            return {"ok": False, "error": "Payment not found"}
+        if "amount" in body:
+            try:
+                amount = float(body.get("amount"))
+            except (TypeError, ValueError):
+                return {"ok": False, "error": "Invalid amount"}
+            if amount <= 0:
+                return {"ok": False, "error": "Amount must be positive"}
+            rec["amount"] = round(amount, 2)
+        if "note" in body:
+            rec["note"] = (body.get("note") or "").strip()
+        if body.get("paid_at"):
+            rec["paid_at"] = body["paid_at"]
+        _save_payments()
+    return {"ok": True, "payment": rec}
+
+
+@app.delete("/api/payments/{payment_id}")
+def api_payments_delete(payment_id: str):
+    """Remove a payment from the ledger."""
+    with _payments_lock:
+        before = len(payments)
+        payments[:] = [p for p in payments if p.get("id") != payment_id]
+        if len(payments) == before:
+            return {"ok": False, "error": "Payment not found"}
+        _save_payments()
+    return {"ok": True}
+
+
 @app.post("/api/payments/bulk-paid")
 def api_payments_bulk_paid(body: dict):
-    """Mark multiple sessions as paid in one call."""
+    """Convenience: record one payment per user covering the selected sessions
+    (sum of their neighbour prices). Sessions then settle via FIFO."""
     session_ids = body.get("session_ids") or []
-    payment_note = (body.get("payment_note") or "").strip()
+    note = (body.get("payment_note") or "").strip()
     if not isinstance(session_ids, list) or not session_ids:
         return {"ok": False, "error": "session_ids required"}
 
     id_set = set(session_ids)
-    now = _utc_iso()
-    updated = 0
-
     with _sessions_lock:
         all_sessions = sessions + ([current_session] if current_session else [])
+        sums: dict[str, float] = {}
         for s in all_sessions:
             if s.get("id") not in id_set:
                 continue
-            meta = s.get("meta") or {}
-            if meta.get("neighbor_price") is None:
-                continue
-            s["meta"] = meta
-            meta["neighbor_paid"] = True
-            meta["neighbor_paid_at"] = now
-            if payment_note:
-                meta["neighbor_payment_note"] = payment_note
-            updated += 1
-        if updated:
-            _save_sessions()
-    return {"ok": True, "updated": updated}
-
-
-@app.get("/api/payments/summary")
-def api_payments_summary():
-    """Aggregate neighbour payment data per user."""
-    with _sessions_lock:
-        all_sessions = sessions[-MAX_SESSIONS:] + ([current_session] if current_session else [])
-        groups = {}  # user -> dict
-        outstanding_total = 0.0
-        received_total = 0.0
-
-        # Iterate oldest-to-newest so the last-seen entry per user wins for last_rate_per_kwh
-        for s in all_sessions:
             meta = s.get("meta") or {}
             price = meta.get("neighbor_price")
             if price is None:
                 continue
             user = meta.get("user", "Unknown")
-            paid = bool(meta.get("neighbor_paid", False))
-            energy = _get_session_energy(s)
+            try:
+                sums[user] = sums.get(user, 0.0) + float(price)
+            except (TypeError, ValueError):
+                continue
 
-            g = groups.setdefault(user, {
+    created = 0
+    now = _utc_iso()
+    with _payments_lock:
+        for user, amount in sums.items():
+            if amount <= 0:
+                continue
+            payments.append({
+                "id": _next_payment_id(),
                 "user": user,
-                "outstanding": 0.0,
-                "paid_total": 0.0,
-                "unpaid_count": 0,
-                "paid_count": 0,
-                "kwh_total": 0.0,
-                "last_rate_per_kwh": None,
+                "amount": round(amount, 2),
+                "paid_at": now,
+                "note": note,
             })
-            g["kwh_total"] += energy
-            if paid:
-                g["paid_total"] += float(price)
-                g["paid_count"] += 1
-                received_total += float(price)
-            else:
-                g["outstanding"] += float(price)
-                g["unpaid_count"] += 1
-                outstanding_total += float(price)
-            if energy > 0:
-                g["last_rate_per_kwh"] = float(price) / energy
+            created += 1
+        if created:
+            _save_payments()
+    return {"ok": True, "created": created}
 
-        groups_list = sorted(groups.values(), key=lambda g: g["outstanding"], reverse=True)
-        for g in groups_list:
-            g["outstanding"] = round(g["outstanding"], 2)
-            g["paid_total"] = round(g["paid_total"], 2)
-            g["kwh_total"] = round(g["kwh_total"], 2)
-            if g["last_rate_per_kwh"] is not None:
-                g["last_rate_per_kwh"] = round(g["last_rate_per_kwh"], 4)
 
-        return {
-            "groups": groups_list,
-            "totals": {
-                "outstanding": round(outstanding_total, 2),
-                "received": round(received_total, 2),
-                "all_time": round(outstanding_total + received_total, 2),
-            }
+def _empty_payment_group(user: str) -> dict:
+    return {
+        "user": user,
+        "charges_total": 0.0,
+        "payments_total": 0.0,
+        "balance": 0.0,
+        "outstanding": 0.0,
+        "credit": 0.0,
+        "kwh_total": 0.0,
+        "last_rate_per_kwh": None,
+        "payments": [],
+    }
+
+
+@app.get("/api/payments/summary")
+def api_payments_summary():
+    """Per-neighbour account: charges (session prices) − payments = balance."""
+    with _payments_lock:
+        pays = list(payments)
+    with _sessions_lock:
+        all_sessions = sessions[-MAX_SESSIONS:] + ([current_session] if current_session else [])
+
+    groups: dict[str, dict] = {}
+    # Charges from sessions (oldest-to-newest so last-seen wins for rate).
+    for s in all_sessions:
+        meta = s.get("meta") or {}
+        price = meta.get("neighbor_price")
+        if price is None:
+            continue
+        user = meta.get("user", "Unknown")
+        energy = _get_session_energy(s)
+        g = groups.setdefault(user, _empty_payment_group(user))
+        try:
+            g["charges_total"] += float(price)
+        except (TypeError, ValueError):
+            continue
+        g["kwh_total"] += energy
+        if energy > 0:
+            g["last_rate_per_kwh"] = float(price) / energy
+
+    # Payments from the ledger (users may have payments but no charges, or vice versa).
+    pay_by_user: dict[str, list] = {}
+    for p in pays:
+        pay_by_user.setdefault(p.get("user", "Unknown"), []).append(p)
+    for user, plist in pay_by_user.items():
+        g = groups.setdefault(user, _empty_payment_group(user))
+        g["payments"] = sorted(plist, key=lambda x: x.get("paid_at", ""), reverse=True)
+        g["payments_total"] = sum(float(x.get("amount", 0) or 0) for x in plist)
+
+    outstanding_total = 0.0
+    received_total = 0.0
+    credit_total = 0.0
+    charges_all_time = 0.0
+    for g in groups.values():
+        bal = g["charges_total"] - g["payments_total"]
+        outstanding_total += max(bal, 0.0)
+        credit_total += max(-bal, 0.0)
+        received_total += g["payments_total"]
+        charges_all_time += g["charges_total"]
+        g["balance"] = round(bal, 2)
+        g["outstanding"] = round(max(bal, 0.0), 2)
+        g["credit"] = round(max(-bal, 0.0), 2)
+        g["charges_total"] = round(g["charges_total"], 2)
+        g["payments_total"] = round(g["payments_total"], 2)
+        g["kwh_total"] = round(g["kwh_total"], 2)
+        if g["last_rate_per_kwh"] is not None:
+            g["last_rate_per_kwh"] = round(g["last_rate_per_kwh"], 4)
+
+    groups_list = sorted(groups.values(), key=lambda g: g["balance"], reverse=True)
+    return {
+        "groups": groups_list,
+        "totals": {
+            "outstanding": round(outstanding_total, 2),
+            "received": round(received_total, 2),
+            "credit": round(credit_total, 2),
+            "all_time": round(charges_all_time, 2),
         }
+    }
 
 
 @app.get("/api/session/{session_id}/neighbors")
@@ -1689,6 +1914,19 @@ def api_telegram_send_settings():
         return {"ok": False, "error": "Settings file not found"}
     
     success, msg = _send_telegram_file(SETTINGS_FILE, "⚙️ Settings data export")
+    return {"ok": success, "message": msg if success else None, "error": msg if not success else None}
+
+
+@app.post("/api/telegram/send-payments")
+def api_telegram_send_payments():
+    """Send payments.json via Telegram."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return {"ok": False, "error": "Telegram not configured"}
+
+    if not os.path.exists(PAYMENTS_FILE):
+        return {"ok": False, "error": "Payments file not found"}
+
+    success, msg = _send_telegram_file(PAYMENTS_FILE, "💸 Payments data export")
     return {"ok": success, "message": msg if success else None, "error": msg if not success else None}
 
 

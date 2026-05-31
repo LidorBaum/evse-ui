@@ -6,5 +6,10 @@ __pycache__/
 .env
 sessions_import.json
 sessions.json
+sessions.pre-payments.json
 settings.json
+payments.json
 samples/
+.sessions_sent_hash
+.payments_sent_hash
+.settings_sent_hash

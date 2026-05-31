@@ -47,15 +47,15 @@
     <div class="grid grid-cols-3 gap-3 mb-4">
       <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-center">
         <div id="cardOutstanding" class="text-2xl font-bold text-amber-600 dark:text-amber-400">₪0</div>
-        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Outstanding</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Owed to you</div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-center">
         <div id="cardReceived" class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₪0</div>
         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Received</div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-center">
-        <div id="cardAllTime" class="text-2xl font-bold text-gray-700 dark:text-gray-200">₪0</div>
-        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">All Time</div>
+        <div id="cardCredit" class="text-2xl font-bold text-sky-600 dark:text-sky-400">₪0</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Credit (prepaid)</div>
       </div>
     </div>
 
@@ -66,14 +66,14 @@
       <div class="inline-flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
         <button onclick="setStatus('all')" id="stAll" class="text-xs px-3 py-2 bg-emerald-500 text-white">All</button>
         <button onclick="setStatus('unpaid')" id="stUnpaid" class="text-xs px-3 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300">Unpaid</button>
-        <button onclick="setStatus('paid')" id="stPaid" class="text-xs px-3 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300">Paid</button>
+        <button onclick="setStatus('paid')" id="stPaid" class="text-xs px-3 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300">Covered</button>
       </div>
       <input type="month" id="monthFilter" onchange="render()" class="text-sm rounded-lg border border-gray-300 dark:border-gray-600 py-2 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
       <button onclick="clearMonth()" class="text-xs text-gray-500 dark:text-gray-400 underline">clear month</button>
     </div>
 
     <div id="emptyState" class="hidden bg-white dark:bg-gray-800 rounded-xl p-10 shadow-sm text-center text-gray-500 dark:text-gray-400">
-      No sessions match these filters. Set a neighbour price on a session from the Sessions page to start tracking.
+      No neighbours yet. Set a neighbour price on a session from the Sessions page to start tracking.
     </div>
 
     <div id="groupsContainer" class="space-y-3"></div>
@@ -85,25 +85,18 @@
       <input type="text" id="bulkNote" placeholder="Payment note (optional)"
         class="flex-1 min-w-[150px] rounded-lg border border-gray-300 dark:border-gray-600 py-2 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm" />
       <button onclick="clearSelection()" class="text-sm px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
-      <button onclick="bulkMarkPaid()" class="text-sm px-4 py-2 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">Mark Paid</button>
+      <button onclick="bulkRecordPayment()" class="text-sm px-4 py-2 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">Record Payment</button>
     </div>
   </div>
 
-  <!-- Neighbour Payment Modal (same as sessions.html) -->
+  <!-- Charge price modal (sets what a session costs the neighbour) -->
   <div id="neighborModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-xl">
-      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">💸 Neighbour Payment</h3>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">⚡ Charge price</h3>
       <div id="neighborMeta" class="text-xs text-gray-500 dark:text-gray-400 mb-4"></div>
       <input type="hidden" id="neighborSessionId" />
       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price (₪)</label>
       <input type="number" id="neighborPrice" step="1" min="0" placeholder="0"
-        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm mb-3" />
-      <label class="flex items-center gap-2 mb-3 cursor-pointer select-none">
-        <input type="checkbox" id="neighborPaid" class="rounded border-gray-300 dark:border-gray-600 text-emerald-500 focus:ring-emerald-500" />
-        <span class="text-sm text-gray-700 dark:text-gray-300">Paid</span>
-      </label>
-      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment note <span class="text-gray-400">(optional)</span></label>
-      <input type="text" id="neighborPaymentNote" placeholder="e.g., Bit, Cash, Bank transfer"
         class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm mb-4" />
       <div class="flex gap-3">
         <button onclick="closeNeighborModal()" class="flex-1 py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
@@ -112,14 +105,38 @@
     </div>
   </div>
 
+  <!-- Record payment modal (money a neighbour handed you) -->
+  <div id="paymentModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-xl">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">💸 Record payment</h3>
+      <div id="paymentMeta" class="text-xs text-gray-500 dark:text-gray-400 mb-4"></div>
+      <input type="hidden" id="paymentUser" />
+      <input type="hidden" id="paymentSessionIds" />
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount (₪)</label>
+      <input type="number" id="paymentAmount" step="1" min="0" placeholder="0"
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm mb-3" />
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+      <input type="date" id="paymentDate"
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm mb-3" />
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note <span class="text-gray-400">(optional)</span></label>
+      <input type="text" id="paymentNote" placeholder="e.g., Bit, Cash, Bank transfer"
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm mb-4" />
+      <div class="flex gap-3">
+        <button onclick="closePaymentModal()" class="flex-1 py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
+        <button onclick="savePayment()" class="flex-1 py-2 px-4 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">Save</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 let allSessions = [];          // sessions with neighbor_price != null
 let groups = [];               // summary groups from /api/payments/summary
-let totals = {outstanding:0, received:0, all_time:0};
+let groupByUser = {};          // user -> summary group
+let totals = {outstanding:0, received:0, credit:0, all_time:0};
 let pricePerKwh = 0.64;
 let clockDiscountPercent = 20;
 let clockSettings = { clock_start: '23:00', clock_end: '07:00' };
-let statusFilter = 'all';
+let statusFilter = 'all';      // all | unpaid | paid(=covered)
 let selected = new Set();
 let expanded = new Set();
 
@@ -130,6 +147,16 @@ function fmtDate(isoStr){
     return d.toLocaleString('he-IL', {
       timeZone: 'Asia/Jerusalem',
       day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit'
+    });
+  } catch(e) { return isoStr; }
+}
+
+function fmtDay(isoStr){
+  if (!isoStr) return '?';
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleDateString('he-IL', {
+      timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit', year: '2-digit'
     });
   } catch(e) { return isoStr; }
 }
@@ -179,6 +206,34 @@ function getMonthKey(isoStr) {
   return jt.getFullYear() + '-' + String(jt.getMonth() + 1).padStart(2, '0');
 }
 
+function todayInputValue() {
+  const jt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+  return jt.getFullYear() + '-' + String(jt.getMonth() + 1).padStart(2, '0') + '-' + String(jt.getDate()).padStart(2, '0');
+}
+
+// Sessions for a user, oldest first (the order FIFO settles them in).
+function userSessionsOldestFirst(user) {
+  return allSessions
+    .filter(s => ((s.meta || {}).user || 'Unknown') === user)
+    .slice()
+    .sort((a, b) => (a.started_at || '').localeCompare(b.started_at || ''));
+}
+
+// FIFO allocation: spread a user's payments over their sessions oldest-first.
+// Returns { sessionId: { status: 'covered'|'partial'|'unpaid', left } }.
+function fifoStatus(user) {
+  const total = (groupByUser[user] || {}).payments_total || 0;
+  let remaining = total;
+  const out = {};
+  userSessionsOldestFirst(user).forEach(s => {
+    const price = Number((s.meta || {}).neighbor_price) || 0;
+    if (remaining >= price) { out[s.id] = { status: 'covered', left: 0 }; remaining -= price; }
+    else if (remaining > 0) { out[s.id] = { status: 'partial', left: price - remaining }; remaining = 0; }
+    else { out[s.id] = { status: 'unpaid', left: price }; }
+  });
+  return out;
+}
+
 async function load() {
   try {
     const [setRes, sumRes, sessRes] = await Promise.all([
@@ -196,7 +251,9 @@ async function load() {
     if (sumRes.ok) {
       const data = await sumRes.json();
       groups = data.groups || [];
-      totals = data.totals || {outstanding:0, received:0, all_time:0};
+      totals = data.totals || {outstanding:0, received:0, credit:0, all_time:0};
+      groupByUser = {};
+      groups.forEach(g => { groupByUser[g.user] = g; });
     }
     if (sessRes.ok) {
       const data = await sessRes.json();
@@ -216,9 +273,11 @@ async function load() {
 
 function populateUserFilter() {
   const select = document.getElementById('userFilter');
+  const cur = select.value;
   const users = groups.map(g => g.user);
   select.innerHTML = '<option value="">All Neighbours</option>' +
     users.map(u => `<option value="${u}">${u}</option>`).join('');
+  if (users.includes(cur)) select.value = cur;
 }
 
 function setStatus(s) {
@@ -236,30 +295,31 @@ function clearMonth() {
   render();
 }
 
-function filteredSessions() {
-  const userF = document.getElementById('userFilter').value;
-  const monthF = document.getElementById('monthFilter').value;
-  return allSessions.filter(s => {
-    const m = s.meta || {};
-    if (userF && (m.user || 'Unknown') !== userF) return false;
-    if (statusFilter === 'paid' && !m.neighbor_paid) return false;
-    if (statusFilter === 'unpaid' && m.neighbor_paid) return false;
-    if (monthF && getMonthKey(s.started_at) !== monthF) return false;
-    return true;
-  });
+function balanceBadge(g) {
+  const bal = g.balance || 0;
+  if (bal > 0.005)  return `<span class="text-amber-600 dark:text-amber-400 font-semibold">₪${Math.round(bal)} due</span>`;
+  if (bal < -0.005) return `<span class="text-sky-600 dark:text-sky-400 font-semibold">₪${Math.round(-bal)} credit</span>`;
+  return `<span class="text-emerald-600 dark:text-emerald-400 font-semibold">settled</span>`;
+}
+
+function statusPill(st) {
+  if (st.status === 'covered') return `<span class="text-xs px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">✓ covered</span>`;
+  if (st.status === 'partial') return `<span class="text-xs px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">₪${Math.round(st.left)} left</span>`;
+  return `<span class="text-xs px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">unpaid</span>`;
 }
 
 function render() {
-  // Update top cards from server totals (don't change with filters — those are global)
   document.getElementById('cardOutstanding').textContent = '₪' + Math.round(totals.outstanding || 0);
   document.getElementById('cardReceived').textContent = '₪' + Math.round(totals.received || 0);
-  document.getElementById('cardAllTime').textContent = '₪' + Math.round(totals.all_time || 0);
+  document.getElementById('cardCredit').textContent = '₪' + Math.round(totals.credit || 0);
 
-  const sessions = filteredSessions();
+  const userF = document.getElementById('userFilter').value;
+  const monthF = document.getElementById('monthFilter').value;
   const container = document.getElementById('groupsContainer');
   const empty = document.getElementById('emptyState');
 
-  if (!sessions.length) {
+  const visibleGroups = groups.filter(g => !userF || g.user === userF);
+  if (!visibleGroups.length) {
     container.innerHTML = '';
     empty.classList.remove('hidden');
     updateBulkBar();
@@ -267,88 +327,97 @@ function render() {
   }
   empty.classList.add('hidden');
 
-  // Group by user
-  const byUser = {};
-  sessions.forEach(s => {
-    const u = (s.meta || {}).user || 'Unknown';
-    (byUser[u] = byUser[u] || []).push(s);
-  });
+  container.innerHTML = visibleGroups.map(g => {
+    const user = g.user;
+    const fifo = fifoStatus(user);
 
-  const userKeys = Object.keys(byUser).sort();
-  container.innerHTML = userKeys.map(user => {
-    const list = byUser[user].slice().sort((a, b) => (b.started_at || '').localeCompare(a.started_at || ''));
-    let outstanding = 0, paidTotal = 0, unpaidCount = 0, paidCount = 0, kwhTotal = 0;
-    list.forEach(s => {
-      const m = s.meta || {};
-      const price = Number(m.neighbor_price) || 0;
-      kwhTotal += getSessionEnergy(s);
-      if (m.neighbor_paid) { paidTotal += price; paidCount++; }
-      else { outstanding += price; unpaidCount++; }
+    // Sessions to display: newest-first, after status + month filters.
+    const display = userSessionsOldestFirst(user).slice().reverse().filter(s => {
+      const st = (fifo[s.id] || {}).status || 'unpaid';
+      if (statusFilter === 'paid' && st !== 'covered') return false;
+      if (statusFilter === 'unpaid' && st === 'covered') return false;
+      if (monthF && getMonthKey(s.started_at) !== monthF) return false;
+      return true;
     });
-    const isExpanded = expanded.has(user);
 
-    const rows = list.map(s => {
+    const isExpanded = expanded.has(user);
+    const sessCount = userSessionsOldestFirst(user).length;
+
+    const rows = display.map(s => {
       const m = s.meta || {};
       const energyVal = getSessionEnergy(s);
       const systemCost = calcSessionCost(energyVal, s.started_at, s.ended_at);
-      const paid = !!m.neighbor_paid;
       const price = Number(m.neighbor_price) || 0;
-      const note = m.neighbor_payment_note || '';
+      const st = fifo[s.id] || { status: 'unpaid', left: price };
+      const canSelect = st.status !== 'covered';
       const checked = selected.has(s.id) ? 'checked' : '';
-      const canSelect = !paid;
       return `<tr class="border-b border-gray-100 dark:border-gray-700 last:border-0">
         <td class="py-2 pl-2 pr-1">${canSelect ? `<input type="checkbox" data-sid="${s.id}" ${checked} onchange="toggleSelect('${s.id}', this.checked)" class="rounded border-gray-300 dark:border-gray-600 text-emerald-500 focus:ring-emerald-500" />` : ''}</td>
         <td class="py-2 px-2 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">${fmtDate(s.started_at)}</td>
         <td class="py-2 px-2 text-sm text-gray-600 dark:text-gray-400 text-right">${energyVal.toFixed(1)} kWh</td>
         <td class="py-2 px-2 text-sm text-gray-500 dark:text-gray-400 text-right">₪${systemCost.toFixed(2)}</td>
         <td class="py-2 px-2 text-sm text-right">
-          <button onclick="openNeighborModal('${s.id}')" class="font-semibold ${paid ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'} hover:underline">₪${Math.round(price)}</button>
+          <button onclick="openNeighborModal('${s.id}')" class="font-semibold text-gray-700 dark:text-gray-200 hover:underline">₪${Math.round(price)}</button>
         </td>
-        <td class="py-2 px-2 text-xs text-gray-500 dark:text-gray-400 max-w-[120px] truncate" title="${note}">${note}</td>
-        <td class="py-2 pl-1 pr-2 text-sm text-right">
-          <button onclick="togglePaid('${s.id}', ${!paid})" class="text-xs px-2 py-1 rounded-md ${paid ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'}">${paid ? '✓ paid' : 'unpaid'}</button>
-        </td>
+        <td class="py-2 pl-1 pr-2 text-sm text-right">${statusPill(st)}</td>
       </tr>`;
     }).join('');
 
-    const unpaidIds = list.filter(s => !(s.meta || {}).neighbor_paid).map(s => s.id);
+    // Payment history (newest first, from summary).
+    const payRows = (g.payments || []).map(p => `
+      <div class="flex items-center justify-between py-1.5 text-sm">
+        <div class="text-gray-700 dark:text-gray-300">
+          <span class="font-medium">₪${Math.round(p.amount)}</span>
+          <span class="text-gray-500 dark:text-gray-400"> · ${fmtDay(p.paid_at)}</span>
+          ${p.note ? `<span class="text-gray-400 dark:text-gray-500"> · ${p.note}</span>` : ''}
+        </div>
+        <button onclick="deletePayment('${p.id}')" title="Delete payment" class="text-xs text-gray-400 hover:text-red-500 px-2">🗑</button>
+      </div>`).join('');
+
+    const unpaidIds = userSessionsOldestFirst(user)
+      .filter(s => ((fifo[s.id] || {}).status) !== 'covered').map(s => s.id);
     const allSelected = unpaidIds.length > 0 && unpaidIds.every(id => selected.has(id));
     const someSelected = unpaidIds.some(id => selected.has(id)) && !allSelected;
     const selectAllAttrs = `${allSelected ? 'checked' : ''} ${someSelected ? 'data-indeterminate="1"' : ''}`;
 
+    const uEsc = user.replace(/'/g, "\\'");
     return `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-      <div class="w-full px-5 py-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
-        <div class="flex items-center gap-3 flex-1 cursor-pointer" onclick="toggleGroup('${user.replace(/'/g, "\\'")}')">
+      <div class="w-full px-5 py-4 flex justify-between items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+        <div class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onclick="toggleGroup('${uEsc}')">
           <svg class="w-4 h-4 text-gray-400 transform transition-transform ${isExpanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-          <span class="font-semibold text-gray-900 dark:text-white">${user}</span>
-          <span class="text-xs text-gray-500 dark:text-gray-400">${list.length} sessions · ${kwhTotal.toFixed(1)} kWh</span>
+          <span class="font-semibold text-gray-900 dark:text-white truncate">${user}</span>
+          <span class="hidden sm:inline text-xs text-gray-500 dark:text-gray-400">${sessCount} sessions · charged ₪${Math.round(g.charges_total)} · paid ₪${Math.round(g.payments_total)}</span>
         </div>
-        <div class="flex items-center gap-3 text-sm">
-          ${unpaidCount > 0 ? `<span class="text-amber-600 dark:text-amber-400 font-semibold">₪${Math.round(outstanding)} unpaid</span>` : ''}
-          ${paidCount > 0 ? `<span class="text-emerald-600 dark:text-emerald-400">₪${Math.round(paidTotal)} paid</span>` : ''}
-          <span onclick="copySummary('${user.replace(/'/g, "\\'")}', ${list.length}, ${kwhTotal.toFixed(2)}, ${Math.round(outstanding)}, ${Math.round(paidTotal)})" class="text-xs text-gray-400 dark:text-gray-500 hover:text-emerald-500 cursor-pointer underline" title="Copy summary">📋</span>
+        <div class="flex items-center gap-3 text-sm shrink-0">
+          ${balanceBadge(g)}
+          <button onclick="openPaymentModal('${uEsc}')" class="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">+ Payment</button>
+          <span onclick="copySummary('${uEsc}')" class="text-xs text-gray-400 dark:text-gray-500 hover:text-emerald-500 cursor-pointer" title="Copy summary">📋</span>
         </div>
       </div>
-      ${isExpanded ? `<div class="overflow-x-auto border-t border-gray-100 dark:border-gray-700">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50 dark:bg-gray-700/40 text-xs uppercase text-gray-500 dark:text-gray-400">
-            <tr>
-              <th class="py-2 pl-2 pr-1 text-left">${unpaidIds.length > 0 ? `<input type="checkbox" ${selectAllAttrs} onchange="selectAllUnpaid('${user.replace(/'/g, "\\'")}', this.checked)" class="group-select rounded border-gray-300 dark:border-gray-600 text-emerald-500 focus:ring-emerald-500" title="Select all unpaid" />` : ''}</th>
-              <th class="py-2 px-2 text-left">Date</th>
-              <th class="py-2 px-2 text-right">kWh</th>
-              <th class="py-2 px-2 text-right">System ₪</th>
-              <th class="py-2 px-2 text-right">Neighbour ₪</th>
-              <th class="py-2 px-2 text-left">Note</th>
-              <th class="py-2 pl-1 pr-2 text-right">Status</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
+      ${isExpanded ? `<div class="border-t border-gray-100 dark:border-gray-700">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-700/40 text-xs uppercase text-gray-500 dark:text-gray-400">
+              <tr>
+                <th class="py-2 pl-2 pr-1 text-left">${unpaidIds.length > 0 ? `<input type="checkbox" ${selectAllAttrs} onchange="selectAllUnpaid('${uEsc}', this.checked)" class="group-select rounded border-gray-300 dark:border-gray-600 text-emerald-500 focus:ring-emerald-500" title="Select all unpaid" />` : ''}</th>
+                <th class="py-2 px-2 text-left">Date</th>
+                <th class="py-2 px-2 text-right">kWh</th>
+                <th class="py-2 px-2 text-right">System ₪</th>
+                <th class="py-2 px-2 text-right">Charge ₪</th>
+                <th class="py-2 pl-1 pr-2 text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody>${rows || `<tr><td colspan="6" class="py-3 px-2 text-center text-xs text-gray-400">No sessions match these filters.</td></tr>`}</tbody>
+          </table>
+        </div>
+        <div class="px-5 py-3 border-t border-gray-100 dark:border-gray-700">
+          <div class="text-xs uppercase text-gray-400 dark:text-gray-500 mb-1">Payments</div>
+          ${payRows || `<div class="text-xs text-gray-400 py-1">No payments recorded yet.</div>`}
+        </div>
       </div>` : ''}
     </div>`;
   }).join('');
 
-  // Apply indeterminate state for partial selections
   document.querySelectorAll('.group-select').forEach(el => {
     el.indeterminate = el.dataset.indeterminate === '1';
   });
@@ -357,10 +426,9 @@ function render() {
 }
 
 function selectAllUnpaid(user, checked) {
-  allSessions.forEach(s => {
-    const m = s.meta || {};
-    if ((m.user || 'Unknown') !== user) return;
-    if (m.neighbor_paid) return;
+  const fifo = fifoStatus(user);
+  userSessionsOldestFirst(user).forEach(s => {
+    if ((fifo[s.id] || {}).status === 'covered') return;
     if (checked) selected.add(s.id);
     else selected.delete(s.id);
   });
@@ -398,11 +466,12 @@ function updateBulkBar() {
   document.getElementById('bulkTotal').textContent = '₪' + Math.round(sum);
 }
 
-async function bulkMarkPaid() {
+// Bulk: record one payment per user = sum of selected charges (settles via FIFO).
+async function bulkRecordPayment() {
   if (!selected.size) return;
   const ids = Array.from(selected);
   const note = document.getElementById('bulkNote').value.trim();
-  if (!confirm('Mark ' + ids.length + ' session(s) as paid?')) return;
+  if (!confirm('Record a payment covering ' + ids.length + ' session(s)?')) return;
   try {
     const r = await fetch('/api/payments/bulk-paid', {
       method: 'POST',
@@ -422,31 +491,76 @@ async function bulkMarkPaid() {
   }
 }
 
-async function togglePaid(sid, newPaid) {
-  const s = allSessions.find(x => x.id === sid);
-  if (!s) return;
-  const m = s.meta || {};
-  try {
-    const r = await fetch('/api/session/' + sid + '/neighbor', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        price: m.neighbor_price,
-        paid: newPaid,
-        payment_note: m.neighbor_payment_note || '',
-      })
-    });
-    if (r.ok) load();
-  } catch(e) {}
+// ---- Record payment modal ----
+function openPaymentModal(user, prefill) {
+  const g = groupByUser[user] || {};
+  const outstanding = Math.max(0, Math.round(g.balance || 0));
+  document.getElementById('paymentUser').value = user;
+  document.getElementById('paymentSessionIds').value = '';
+  document.getElementById('paymentMeta').textContent =
+    `${user} · balance ${g.balance > 0 ? '₪' + Math.round(g.balance) + ' due' : (g.balance < 0 ? '₪' + Math.round(-g.balance) + ' credit' : 'settled')}`;
+  document.getElementById('paymentAmount').value = (prefill != null ? Math.round(prefill) : outstanding) || '';
+  document.getElementById('paymentDate').value = todayInputValue();
+  document.getElementById('paymentNote').value = '';
+  document.getElementById('paymentModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('paymentAmount').focus(), 50);
 }
 
-function copySummary(user, count, kwh, outstanding, paid) {
+function closePaymentModal() {
+  document.getElementById('paymentModal').classList.add('hidden');
+}
+
+async function savePayment() {
+  const user = document.getElementById('paymentUser').value;
+  const amountRaw = document.getElementById('paymentAmount').value;
+  const amount = parseFloat(amountRaw);
+  if (amountRaw === '' || isNaN(amount) || amount <= 0) {
+    alert('Enter a valid amount');
+    return;
+  }
+  const dateVal = document.getElementById('paymentDate').value;
+  const body = {
+    user,
+    amount,
+    note: document.getElementById('paymentNote').value.trim(),
+  };
+  if (dateVal) body.paid_at = dateVal + 'T12:00:00Z';
+  try {
+    const r = await fetch('/api/payments', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    if (data.ok) { closePaymentModal(); load(); }
+    else alert(data.error || 'Failed to save');
+  } catch(e) {
+    alert('Failed to save: ' + e.message);
+  }
+}
+
+async function deletePayment(id) {
+  if (!confirm('Delete this payment?')) return;
+  try {
+    const r = await fetch('/api/payments/' + id, { method: 'DELETE' });
+    const data = await r.json();
+    if (data.ok) load();
+    else alert(data.error || 'Failed');
+  } catch(e) {
+    alert('Failed: ' + e.message);
+  }
+}
+
+function copySummary(user) {
+  const g = groupByUser[user] || {};
+  const bal = g.balance || 0;
+  const balLine = bal > 0 ? `Balance: ₪${Math.round(bal)} due`
+    : (bal < 0 ? `Balance: ₪${Math.round(-bal)} credit` : 'Balance: settled');
   const lines = [
-    `${user} — neighbour payment summary`,
-    `Sessions: ${count}`,
-    `Total energy: ${kwh} kWh`,
-    `Outstanding: ₪${outstanding}`,
-    `Paid: ₪${paid}`,
+    `${user} — payment summary`,
+    `Charged: ₪${Math.round(g.charges_total || 0)}`,
+    `Paid: ₪${Math.round(g.payments_total || 0)}`,
+    balLine,
   ];
   const text = lines.join('\n');
   navigator.clipboard.writeText(text).then(() => {
@@ -456,16 +570,16 @@ function copySummary(user, count, kwh, outstanding, paid) {
   });
 }
 
-// Neighbour modal — same behaviour as sessions.html
+// ---- Charge price modal ----
 let neighborRateByUser = null;
-async function ensureNeighborRates() {
+function ensureNeighborRates() {
   if (neighborRateByUser !== null) return;
   const map = {};
   groups.forEach(g => { if (g.last_rate_per_kwh != null) map[g.user] = g.last_rate_per_kwh; });
   neighborRateByUser = map;
 }
 
-async function openNeighborModal(sessionId) {
+function openNeighborModal(sessionId) {
   const s = allSessions.find(x => x.id === sessionId);
   if (!s) return;
   const meta = s.meta || {};
@@ -481,13 +595,11 @@ async function openNeighborModal(sessionId) {
   if (meta.neighbor_price != null) {
     price = meta.neighbor_price;
   } else {
-    await ensureNeighborRates();
+    ensureNeighborRates();
     const rate = neighborRateByUser && neighborRateByUser[user];
     price = (rate != null && energyVal > 0) ? Math.ceil(rate * energyVal) : Math.ceil(systemCost);
   }
-  document.getElementById('neighborPrice').value = price;
-  document.getElementById('neighborPaid').checked = !!meta.neighbor_paid;
-  document.getElementById('neighborPaymentNote').value = meta.neighbor_payment_note || '';
+  document.getElementById('neighborPrice').value = Math.round(price);
   document.getElementById('neighborModal').classList.remove('hidden');
   setTimeout(() => document.getElementById('neighborPrice').focus(), 50);
 }
@@ -503,16 +615,11 @@ async function saveNeighbor() {
     alert('Enter a valid price');
     return;
   }
-  const body = {
-    price: parseFloat(priceRaw),
-    paid: document.getElementById('neighborPaid').checked,
-    payment_note: document.getElementById('neighborPaymentNote').value.trim(),
-  };
   try {
     const r = await fetch('/api/session/' + sid + '/neighbor', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(body)
+      body: JSON.stringify({ price: parseFloat(priceRaw) })
     });
     const data = await r.json();
     if (data.ok) {
