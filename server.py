@@ -1966,15 +1966,24 @@ def api_amps(amps: int):
     return {"ok": True, "amps": amps}
 
 
+# Placeholder -> partial template file. Substituted by _read_template().
+_PARTIALS = {
+    "{{CHART_MODAL}}": "_chart_modal.html",
+    "{{SIDEBAR}}": "_sidebar.html",
+    "{{NAV_BUTTON}}": "_nav_button.html",
+    "{{ACTION_SHEET}}": "_action_sheet.html",
+}
+
+
 def _read_template(name: str) -> str:
-    """Read an HTML template file. Substitutes {{CHART_MODAL}} with the shared partial."""
+    """Read an HTML template file, substituting {{PLACEHOLDER}} tokens with shared partials."""
     template_path = TEMPLATES_DIR / name
     with open(template_path, "r", encoding="utf-8") as f:
         html = f.read()
-    if "{{CHART_MODAL}}" in html:
-        partial_path = TEMPLATES_DIR / "_chart_modal.html"
-        with open(partial_path, "r", encoding="utf-8") as f:
-            html = html.replace("{{CHART_MODAL}}", f.read())
+    for token, partial_name in _PARTIALS.items():
+        if token in html:
+            with open(TEMPLATES_DIR / partial_name, "r", encoding="utf-8") as f:
+                html = html.replace(token, f.read())
     return html
 
 

@@ -48,11 +48,13 @@
   </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
-  <!-- Header -->
-  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors pt-[env(safe-area-inset-top)]">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-      <h1 class="text-xl font-semibold text-gray-900 dark:text-white">⚙️ Settings</h1>
-      <button onclick="location.href='/'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">← Back</button>
+  {{SIDEBAR}}
+
+  <!-- Top bar -->
+  <header class="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-20 transition-colors pt-[env(safe-area-inset-top)]">
+    <div class="px-4 sm:px-6 lg:px-8 flex items-center gap-3 h-16">
+      {{NAV_BUTTON}}
+      <h1 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">Settings</h1>
     </div>
   </header>
 

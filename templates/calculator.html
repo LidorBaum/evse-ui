@@ -48,11 +48,13 @@
   </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
-  <!-- Header -->
-  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors pt-[env(safe-area-inset-top)]">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-      <h1 class="text-xl font-semibold text-gray-900 dark:text-white">🔌 Amps Calculator</h1>
-      <button onclick="location.href='/'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">← Back</button>
+  {{SIDEBAR}}
+
+  <!-- Top bar -->
+  <header class="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-20 transition-colors pt-[env(safe-area-inset-top)]">
+    <div class="px-4 sm:px-6 lg:px-8 flex items-center gap-3 h-16">
+      {{NAV_BUTTON}}
+      <h1 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">Amps Calculator</h1>
     </div>
   </header>
 
@@ -60,39 +62,44 @@
   <main class="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
     <div class="grid md:grid-cols-2 gap-4">
       <!-- Input Column -->
-      <div class="space-y-4">
-        <!-- Current Battery -->
+      <!-- Mobile: inputs sit under the result so the answer stays in view while typing -->
+      <div class="space-y-4 order-2 md:order-1">
+        <!-- Battery range -->
         <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
-          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Current Battery %</label>
-          <input type="number" id="currentPercent" min="0" max="100" value="20" inputmode="numeric" 
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Current %</label>
+              <input type="number" id="currentPercent" min="0" max="100" value="20" inputmode="numeric"
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Target %</label>
+              <input type="number" id="targetPercent" min="0" max="100" value="80" inputmode="numeric"
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
+            </div>
+          </div>
         </div>
 
-        <!-- Target Battery -->
+        <!-- Time -->
         <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
-          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Target Battery %</label>
-          <input type="number" id="targetPercent" min="0" max="100" value="80" inputmode="numeric"
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
-        </div>
-
-        <!-- Time Available -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
-          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Time Available (hours)</label>
-          <input type="number" id="availableHours" min="0" step="0.5" value="8" inputmode="decimal"
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
-        </div>
-
-        <!-- Balancing Time -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm transition-colors">
-          <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Balancing Time (minutes)</label>
-          <input type="number" id="balancingMinutes" min="0" value="0" inputmode="numeric"
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Extra time when charging slows near full to equalize cell voltages</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Hours available</label>
+              <input type="number" id="availableHours" min="0" step="0.5" value="8" inputmode="decimal"
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Balancing (min)</label>
+              <input type="number" id="balancingMinutes" min="0" value="0" inputmode="numeric"
+                class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-3 px-4 text-lg text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Balancing is extra time when charging slows near full to equalize cell voltages</p>
         </div>
       </div>
 
       <!-- Result Column -->
-      <div class="space-y-4">
+      <div class="space-y-4 order-1 md:order-2">
         <!-- Result Card -->
         <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm transition-colors" id="resultCard">
           <div class="text-center">
