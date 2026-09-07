@@ -72,6 +72,12 @@ os.makedirs(SAMPLES_DIR, exist_ok=True)
 # ---- Settings config ----
 SETTINGS_FILE = os.getenv("SETTINGS_FILE", "settings.json")
 
+# Chip colours a user can be assigned; mirrors USER_COLOR_KEYS in _user_colors.html.
+USER_COLOR_KEYS = [
+    "slate", "emerald", "blue", "violet", "amber",
+    "rose", "cyan", "lime", "orange", "pink",
+]
+
 # ---- Neighbour payments ledger config ----
 PAYMENTS_FILE = os.getenv("PAYMENTS_FILE", "payments.json")
 # One-time pre-migration snapshot of sessions.json (belt-and-braces backup).
@@ -210,6 +216,7 @@ def _load_settings() -> dict:
         "clock_start": "07:00",
         "clock_end": "23:00",
         "users": ["User"],
+        "user_colors": {},  # user name -> chip colour key (see USER_COLOR_KEYS)
         "selected_user": "User",  # Currently selected user for new sessions
         "price_per_kwh": 0.64,
         "clock_discount_percent": 20,  # 20% off during clock hours
@@ -1524,6 +1531,12 @@ def api_post_settings(new_settings: dict):
         app_settings["clock_end"] = new_settings["clock_end"]
     if "users" in new_settings and isinstance(new_settings["users"], list):
         app_settings["users"] = new_settings["users"]
+    if "user_colors" in new_settings and isinstance(new_settings["user_colors"], dict):
+        app_settings["user_colors"] = {
+            str(user): colour
+            for user, colour in new_settings["user_colors"].items()
+            if colour in USER_COLOR_KEYS
+        }
     if "selected_user" in new_settings:
         app_settings["selected_user"] = new_settings["selected_user"]
     if "price_per_kwh" in new_settings:
@@ -1972,6 +1985,7 @@ _PARTIALS = {
     "{{SIDEBAR}}": "_sidebar.html",
     "{{NAV_BUTTON}}": "_nav_button.html",
     "{{ACTION_SHEET}}": "_action_sheet.html",
+    "{{USER_COLORS}}": "_user_colors.html",
 }
 
 

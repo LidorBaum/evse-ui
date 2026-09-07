@@ -94,6 +94,8 @@
     </div>
   </div>
 
+  {{USER_COLORS}}
+
   <!-- Charge price modal (sets what a session costs the neighbour) -->
   <div id="neighborModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-xl">
@@ -252,6 +254,7 @@ async function load() {
       clockDiscountPercent = s.clock_discount_percent ?? 20;
       clockSettings.clock_start = s.clock_start || '23:00';
       clockSettings.clock_end = s.clock_end || '07:00';
+      setUserColors(s.user_colors);
     }
     if (sumRes.ok) {
       const data = await sumRes.json();
@@ -415,15 +418,18 @@ function render() {
 
     const uEsc = user.replace(/'/g, "\\'");
     return `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-      <div class="w-full px-5 py-4 flex justify-between items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
-        <div class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onclick="toggleGroup('${uEsc}')">
-          <svg class="w-4 h-4 text-gray-400 transform transition-transform ${isExpanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      <!-- Mobile stacks name/balance over the actions so the name never truncates -->
+      <div class="w-full px-4 sm:px-5 py-3 sm:py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+        <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 cursor-pointer" onclick="toggleGroup('${uEsc}')">
+          <svg class="w-4 h-4 shrink-0 text-gray-400 transform transition-transform ${isExpanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          ${userDot(user)}
           <span class="font-semibold text-gray-900 dark:text-white truncate">${user}</span>
           <span class="hidden sm:inline text-xs text-gray-500 dark:text-gray-400">${sessCount} sessions · charged ₪${Math.round(g.charges_total)} · paid ₪${Math.round(g.payments_total)}</span>
+          <span class="ml-auto sm:hidden text-sm">${balanceBadge(g)}</span>
         </div>
-        <div class="flex items-center gap-3 text-sm shrink-0">
-          ${balanceBadge(g)}
-          <button onclick="openPaymentModal('${uEsc}')" class="text-xs px-3 py-1.5 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">+ Payment</button>
+        <div class="flex items-center justify-end gap-2 sm:gap-3 text-sm shrink-0">
+          <span class="hidden sm:inline">${balanceBadge(g)}</span>
+          <button onclick="openPaymentModal('${uEsc}')" class="text-xs px-4 py-2 sm:py-1.5 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">+ Payment</button>
           <button onclick="copySummary('${uEsc}')" class="icon-btn text-gray-400 dark:text-gray-500 hover:text-emerald-500" title="Copy summary" aria-label="Copy summary">
             <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
           </button>

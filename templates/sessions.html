@@ -144,6 +144,8 @@
 
   {{ACTION_SHEET}}
 
+  {{USER_COLORS}}
+
   <!-- User Switch Modal -->
   <div id="userModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-sm mx-4 shadow-xl">
@@ -826,7 +828,7 @@ function toggleMonths() {
 
 function sessionPills(s, ongoing, user, mergedFrom, neighborPrice) {
   return [
-    `<span class="pill bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">${user}</span>`,
+    userChip(user),
     ongoing ? '<span class="pill bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">🔌 Charging</span>' : '',
     mergedFrom ? '<span class="pill bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">🔗 merged</span>' : '',
     neighborPrice != null
@@ -863,11 +865,11 @@ function fmtSession(s){
   return `<div class="py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
     <div class="flex items-start gap-2">
       <div class="min-w-0 flex-1">
-        <div class="flex items-baseline gap-2 flex-wrap">
+        <div class="flex items-center gap-x-2 gap-y-1.5 flex-wrap">
           <span class="font-bold text-gray-900 dark:text-white">${energy}</span>
           <span class="text-gray-600 dark:text-gray-400">${cost}</span>
+          ${sessionPills(s, ongoing, user, mergedFrom, neighborPrice)}
         </div>
-        <div class="mt-1.5 flex flex-wrap items-center gap-1.5">${sessionPills(s, ongoing, user, mergedFrom, neighborPrice)}</div>
         <div class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">${start} → ${end}</div>
         ${note ? `<div class="mt-1 text-sm italic text-amber-600 dark:text-amber-400 break-words">${note}</div>` : ''}
       </div>
@@ -913,6 +915,7 @@ async function loadSettings(){
     clockSettings.clock_start = s.clock_start || '23:00';
     clockSettings.clock_end = s.clock_end || '07:00';
     availableUsers = s.users || ['User'];
+    setUserColors(s.user_colors);
     window.batteryCapacity = s.battery_capacity_kwh || 64;
   } catch(e) {}
 }
