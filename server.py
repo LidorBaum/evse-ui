@@ -2073,3 +2073,12 @@ def payments_page(evse_auth: str | None = Cookie(default=None)):
         return redirect
     html = _read_template("payments.html")
     return HTMLResponse(html)
+
+
+@app.get("/profits")
+def profits_page(evse_auth: str | None = Cookie(default=None)):
+    redirect = _check_auth(evse_auth)
+    if redirect:
+        return redirect
+    html = _read_template("profits.html")
+    return HTMLResponse(html)

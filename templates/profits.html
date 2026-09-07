@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+  <title>Profits - MG4 Charger</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
+  <script>
+    if (localStorage.getItem('darkMode') !== 'false') {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    button {
+      transition: transform 0.1s ease, opacity 0.1s ease, background-color 0.15s ease;
+    }
+    button:active:not(:disabled) {
+      transform: scale(0.97);
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors">
+  {{SIDEBAR}}
+
+  <!-- Top bar -->
+  <header class="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-20 transition-colors pt-[env(safe-area-inset-top)]">
+    <div class="px-4 sm:px-6 lg:px-8 flex items-center gap-3 h-16">
+      {{NAV_BUTTON}}
+      <h1 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">Profits</h1>
+      {{NAV_BUTTON_RIGHT}}
+    </div>
+  </header>
+
+  <div id="loadingState" class="flex items-center justify-center py-20">
+    <div class="text-center text-gray-500 dark:text-gray-400">
+      <svg class="w-8 h-8 mb-2 mx-auto animate-spin text-emerald-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+      <div>Loading profits...</div>
+    </div>
+  </div>
+
+  <main id="contentArea" class="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto" style="display:none;">
+    <!-- Totals -->
+    <div class="grid grid-cols-3 gap-3 mb-4">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-center">
+        <div id="cardProfit" class="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">₪0</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Profit</div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-center">
+        <div id="cardCharged" class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white whitespace-nowrap">₪0</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Charged</div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm text-center">
+        <div id="cardCost" class="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap">₪0</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">System cost</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm mb-4 flex flex-wrap gap-3 items-center">
+      <select id="userFilter" onchange="render()" class="text-sm rounded-lg border border-gray-300 dark:border-gray-600 py-2 pl-3 pr-8 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500">
+        <option value="">All Neighbours</option>
+      </select>
+      <input type="month" id="monthFilter" onchange="render()" class="text-sm rounded-lg border border-gray-300 dark:border-gray-600 py-2 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500" />
+      <button onclick="clearMonth()" class="text-xs px-3 py-2 rounded-lg text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Clear month</button>
+    </div>
+
+    <!-- Monthly profit chart -->
+    <div id="chartCard" class="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-5 shadow-sm mb-4">
+      <div class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Profit per month</div>
+      <div class="h-56 sm:h-64"><canvas id="profitChart"></canvas></div>
+    </div>
+
+    <div id="emptyState" class="hidden bg-white dark:bg-gray-800 rounded-xl p-10 shadow-sm text-center text-gray-500 dark:text-gray-400">
+      No charged sessions yet. Set a charge price on a session from the Sessions page to start tracking profit.
+    </div>
+
+    <div id="groupsContainer" class="space-y-3"></div>
+  </main>
+
+  {{USER_COLORS}}
+
+<script>
+// ---- State ----
+let pricePerKwh = 0.64;
+let clockDiscountPercent = 20;
+let clockSettings = { clock_start: '23:00', clock_end: '07:00' };
+let pricedSessions = [];          // sessions that have a charge price, newest first
+const expanded = new Set();
+let profitChart = null;
+
+// ---- Formatting / cost helpers (same maths as the payments page) ----
+function fmtDate(isoStr){
+  if (!isoStr) return '?';
+  try {
+    return new Date(isoStr).toLocaleString('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit'
+    });
+  } catch(e) { return isoStr; }
+}
+
+function money(v) {
+  const rounded = Math.round(v * 100) / 100;
+  return '₪' + (Number.isInteger(rounded) ? rounded : rounded.toFixed(2));
+}
+
+function signedMoney(v) {
+  const sign = v < -0.005 ? '−' : '+';
+  return sign + money(Math.abs(v));
+}
+
+function getSessionEnergy(s) {
+  if (s.session_energy_kwh != null) return s.session_energy_kwh;
+  if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
+    return s.end_amount_kwh - s.start_amount_kwh;
+  }
+  return 0;
+}
+
+function isMinuteInClock(minute) {
+  const [sh, sm] = clockSettings.clock_start.split(':').map(Number);
+  const [eh, em] = clockSettings.clock_end.split(':').map(Number);
+  const sM = sh * 60 + sm, eM = eh * 60 + em;
+  if (sM <= eM) return minute >= sM && minute < eM;
+  return minute >= sM || minute < eM;
+}
+
+function calcSessionCost(energyVal, startedAt, endedAt) {
+  if (!energyVal || energyVal <= 0) return 0;
+  if (!startedAt || !endedAt) return energyVal * pricePerKwh;
+  const start = new Date(startedAt);
+  const end = new Date(endedAt);
+  const totalMins = Math.max(1, Math.round((end - start) / 60000));
+  let clockMins = 0;
+  const step = Math.max(1, Math.floor(totalMins / 100));
+  for (let i = 0; i < totalMins; i += step) {
+    const t = new Date(start.getTime() + i * 60000);
+    const jt = new Date(t.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+    const mod = jt.getHours() * 60 + jt.getMinutes();
+    if (isMinuteInClock(mod)) clockMins += step;
+  }
+  clockMins = Math.min(clockMins, totalMins);
+  const nonClockMins = totalMins - clockMins;
+  const clockEnergy = energyVal * (clockMins / totalMins);
+  const nonClockEnergy = energyVal * (nonClockMins / totalMins);
+  const mult = 1 - (clockDiscountPercent / 100);
+  return clockEnergy * pricePerKwh * mult + nonClockEnergy * pricePerKwh;
+}
+
+function getMonthKey(isoStr) {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  const jt = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+  return jt.getFullYear() + '-' + String(jt.getMonth() + 1).padStart(2, '0');
+}
+
+function monthLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+}
+
+// ---- Per-session profit ----
+function sessionProfit(s) {
+  const energy = getSessionEnergy(s);
+  const cost = calcSessionCost(energy, s.started_at, s.ended_at);
+  const charged = Number((s.meta || {}).neighbor_price) || 0;
+  return { energy, cost, charged, profit: charged - cost };
+}
+
+// ---- Rendering ----
+function clearMonth() {
+  document.getElementById('monthFilter').value = '';
+  render();
+}
+
+function toggleGroup(user) {
+  if (expanded.has(user)) expanded.delete(user);
+  else expanded.add(user);
+  render();
+}
+
+function visibleSessions() {
+  const userF = document.getElementById('userFilter').value;
+  const monthF = document.getElementById('monthFilter').value;
+  return pricedSessions.filter(s => {
+    const user = (s.meta || {}).user || 'Unknown';
+    if (userF && user !== userF) return false;
+    if (monthF && getMonthKey(s.started_at) !== monthF) return false;
+    return true;
+  });
+}
+
+function render() {
+  const sessions = visibleSessions();
+
+  let totalCharged = 0, totalCost = 0;
+  const byUser = new Map();
+  for (const s of sessions) {
+    const user = (s.meta || {}).user || 'Unknown';
+    const p = sessionProfit(s);
+    totalCharged += p.charged;
+    totalCost += p.cost;
+    if (!byUser.has(user)) byUser.set(user, { user, charged: 0, cost: 0, kwh: 0, sessions: [] });
+    const g = byUser.get(user);
+    g.charged += p.charged;
+    g.cost += p.cost;
+    g.kwh += p.energy;
+    g.sessions.push({ s, ...p });
+  }
+
+  const totalProfit = totalCharged - totalCost;
+  document.getElementById('cardProfit').textContent =
+    (totalProfit < -0.005 ? '−₪' : '₪') + Math.round(Math.abs(totalProfit));
+  document.getElementById('cardCharged').textContent = '₪' + Math.round(totalCharged);
+  document.getElementById('cardCost').textContent = '₪' + Math.round(totalCost);
+
+  const container = document.getElementById('groupsContainer');
+  const empty = document.getElementById('emptyState');
+  const chartCard = document.getElementById('chartCard');
+
+  if (!sessions.length) {
+    container.innerHTML = '';
+    empty.classList.remove('hidden');
+    chartCard.classList.add('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  chartCard.classList.remove('hidden');
+
+  // Most profitable first
+  const groups = [...byUser.values()].sort((a, b) => (b.charged - b.cost) - (a.charged - a.cost));
+
+  container.innerHTML = groups.map(g => {
+    const profit = g.charged - g.cost;
+    const margin = g.charged > 0 ? Math.round((profit / g.charged) * 100) : 0;
+    const isExpanded = expanded.has(g.user);
+    const uEsc = g.user.replace(/'/g, "\\'");
+
+    const rows = g.sessions.map(r => `
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-medium text-gray-800 dark:text-gray-200">${fmtDate(r.s.started_at)}</div>
+          <div class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">${r.energy.toFixed(1)} kWh · charged ${money(r.charged)} · system ${money(r.cost)}</div>
+        </div>
+        <div class="text-sm font-semibold shrink-0 ${r.profit < -0.005 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}">${signedMoney(r.profit)}</div>
+      </div>`).join('');
+
+    return `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+      <div class="w-full px-3 sm:px-5 py-3 sm:py-4 flex justify-between items-center gap-2 sm:gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0 cursor-pointer" onclick="toggleGroup('${uEsc}')">
+          <svg class="w-4 h-4 shrink-0 text-gray-400 transform transition-transform ${isExpanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          ${userDot(g.user)}
+          <span class="font-semibold text-gray-900 dark:text-white truncate" title="${g.user}">${g.user}</span>
+          <span class="hidden sm:inline text-xs text-gray-500 dark:text-gray-400">${g.sessions.length} sessions · ${g.kwh.toFixed(1)} kWh · charged ${money(g.charged)} · system ${money(g.cost)}</span>
+        </div>
+        <div class="text-right shrink-0">
+          <div class="text-sm font-semibold ${profit < -0.005 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}">${signedMoney(profit)}</div>
+          <div class="text-[11px] text-gray-400 dark:text-gray-500">${margin}% margin</div>
+        </div>
+      </div>
+      ${isExpanded ? `<div class="border-t border-gray-100 dark:border-gray-700">
+        <div class="sm:hidden px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/40">
+          ${g.sessions.length} sessions · ${g.kwh.toFixed(1)} kWh · charged ${money(g.charged)} · system ${money(g.cost)}
+        </div>
+        ${rows}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  renderChart(sessions);
+}
+
+function renderChart(sessions) {
+  const monthly = new Map();
+  for (const s of sessions) {
+    const key = getMonthKey(s.started_at);
+    if (!key) continue;
+    const p = sessionProfit(s);
+    if (!monthly.has(key)) monthly.set(key, 0);
+    monthly.set(key, monthly.get(key) + p.profit);
+  }
+
+  const keys = [...monthly.keys()].sort().slice(-12);
+  const values = keys.map(k => Math.round(monthly.get(k) * 100) / 100);
+  const isDark = document.documentElement.classList.contains('dark');
+  const grid = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const ticks = isDark ? '#9ca3af' : '#6b7280';
+
+  if (profitChart) profitChart.destroy();
+  profitChart = new Chart(document.getElementById('profitChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: keys.map(monthLabel),
+      datasets: [{
+        label: 'Profit',
+        data: values,
+        backgroundColor: values.map(v => v < 0 ? 'rgba(239, 68, 68, 0.8)' : 'rgba(16, 185, 129, 0.8)'),
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: isDark ? '#374151' : '#fff',
+          titleColor: isDark ? '#fff' : '#111827',
+          bodyColor: isDark ? '#d1d5db' : '#4b5563',
+          borderColor: isDark ? '#4b5563' : '#e5e7eb',
+          borderWidth: 1,
+          padding: 12,
+          cornerRadius: 8,
+          callbacks: { label: (ctx) => 'Profit: ' + signedMoney(ctx.parsed.y) }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: ticks } },
+        y: {
+          grid: { color: grid },
+          ticks: { color: ticks, callback: (v) => '₪' + v }
+        }
+      }
+    }
+  });
+}
+
+function populateUserFilter() {
+  const users = [...new Set(pricedSessions.map(s => (s.meta || {}).user || 'Unknown'))].sort();
+  const select = document.getElementById('userFilter');
+  const current = select.value;
+  select.innerHTML = '<option value="">All Neighbours</option>' +
+    users.map(u => `<option value="${u}">${u}</option>`).join('');
+  select.value = current;
+}
+
+async function load() {
+  try {
+    const [setRes, sessRes] = await Promise.all([
+      fetch('/api/settings'),
+      fetch('/api/sessions?page=1&page_size=2000'),
+    ]);
+    if (setRes.ok) {
+      const s = await setRes.json();
+      pricePerKwh = s.price_per_kwh ?? 0.64;
+      clockDiscountPercent = s.clock_discount_percent ?? 20;
+      clockSettings.clock_start = s.clock_start || '23:00';
+      clockSettings.clock_end = s.clock_end || '07:00';
+      setUserColors(s.user_colors);
+    }
+    if (sessRes.ok) {
+      const data = await sessRes.json();
+      // Profit only exists where a charge price was set, on a finished session
+      pricedSessions = (data.sessions || []).filter(s => {
+        const m = s.meta || {};
+        return m.neighbor_price != null && s.ended_at;
+      });
+    }
+
+    populateUserFilter();
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('contentArea').style.display = 'block';
+    render();
+  } catch (e) {
+    document.getElementById('loadingState').innerHTML =
+      '<div class="text-center text-red-500">❌ Failed to load profits.</div>';
+  }
+}
+
+// Chart colours are baked in at render time
+document.addEventListener('darkmodechange', () => { if (pricedSessions.length) render(); });
+
+load();
+</script>
+</body>
+</html>
