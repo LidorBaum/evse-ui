@@ -418,21 +418,16 @@ function render() {
 
     const uEsc = user.replace(/'/g, "\\'");
     return `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-      <!-- Mobile stacks name/balance over the actions so the name never truncates -->
-      <div class="w-full px-4 sm:px-5 py-3 sm:py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+      <div class="w-full px-3 sm:px-5 py-3 sm:py-4 flex justify-between items-center gap-2 sm:gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
         <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 cursor-pointer" onclick="toggleGroup('${uEsc}')">
           <svg class="w-4 h-4 shrink-0 text-gray-400 transform transition-transform ${isExpanded ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
           ${userDot(user)}
-          <span class="font-semibold text-gray-900 dark:text-white truncate">${user}</span>
+          <span class="font-semibold text-gray-900 dark:text-white truncate" title="${user}">${user}</span>
           <span class="hidden sm:inline text-xs text-gray-500 dark:text-gray-400">${sessCount} sessions · charged ₪${Math.round(g.charges_total)} · paid ₪${Math.round(g.payments_total)}</span>
-          <span class="ml-auto sm:hidden text-sm">${balanceBadge(g)}</span>
         </div>
-        <div class="flex items-center justify-end gap-2 sm:gap-3 text-sm shrink-0">
-          <span class="hidden sm:inline">${balanceBadge(g)}</span>
-          <button onclick="openPaymentModal('${uEsc}')" class="text-xs px-4 py-2 sm:py-1.5 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">+ Payment</button>
-          <button onclick="copySummary('${uEsc}')" class="icon-btn text-gray-400 dark:text-gray-500 hover:text-emerald-500" title="Copy summary" aria-label="Copy summary">
-            <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
-          </button>
+        <div class="flex items-center gap-1.5 sm:gap-3 text-sm shrink-0">
+          ${balanceBadge(g)}
+          <button onclick="openPaymentModal('${uEsc}')" class="text-xs px-3 sm:px-4 py-2 sm:py-1.5 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition whitespace-nowrap">+ Payment</button>
         </div>
       </div>
       ${isExpanded ? `<div class="border-t border-gray-100 dark:border-gray-700">
@@ -595,25 +590,6 @@ async function deletePayment(id) {
   } catch(e) {
     alert('Failed: ' + e.message);
   }
-}
-
-function copySummary(user) {
-  const g = groupByUser[user] || {};
-  const bal = g.balance || 0;
-  const balLine = bal > 0 ? `Balance: ₪${Math.round(bal)} due`
-    : (bal < 0 ? `Balance: ₪${Math.round(-bal)} credit` : 'Balance: settled');
-  const lines = [
-    `${user} — payment summary`,
-    `Charged: ₪${Math.round(g.charges_total || 0)}`,
-    `Paid: ₪${Math.round(g.payments_total || 0)}`,
-    balLine,
-  ];
-  const text = lines.join('\n');
-  navigator.clipboard.writeText(text).then(() => {
-    alert('Summary copied to clipboard');
-  }).catch(() => {
-    prompt('Copy manually:', text);
-  });
 }
 
 // ---- Charge price modal ----
