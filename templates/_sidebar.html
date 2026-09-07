@@ -19,6 +19,16 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
   html.nav-open #sidebar { transform: translateX(0); }
+
+  /* Opened from the right-hand hamburger: dock the drawer to that edge instead */
+  html.nav-right #sidebar {
+    left: auto;
+    right: 0;
+    transform: translateX(100%);
+    border-right-width: 0;
+    border-left-width: 1px;
+  }
+  html.nav-right.nav-open #sidebar { transform: translateX(0); }
   #navOverlay {
     position: fixed;
     inset: 0;
@@ -37,6 +47,15 @@
     html.nav-collapsed body { padding-left: 0; }
     #navOverlay { display: none; }
     html.nav-open, html.nav-open body { overflow: auto; }
+    /* Desktop keeps the rail on the left whichever button opened it */
+    html.nav-right #sidebar {
+      left: 0;
+      right: auto;
+      transform: translateX(0);
+      border-right-width: 1px;
+      border-left-width: 0;
+    }
+    html.nav-right.nav-collapsed #sidebar { transform: translateX(-100%); }
   }
   .nav-link {
     display: flex;
@@ -148,16 +167,25 @@
 <script>
   function isDesktopNav() { return window.matchMedia('(min-width: 1024px)').matches; }
 
-  function openNav() { document.documentElement.classList.add('nav-open'); }
+  // side: 'left' | 'right' - which hamburger was pressed, so the drawer
+  // slides in from the edge the thumb is already at.
+  function openNav(side) {
+    const root = document.documentElement;
+    root.classList.toggle('nav-right', side === 'right');
+    root.classList.add('nav-open');
+  }
+
   function closeNav() { document.documentElement.classList.remove('nav-open'); }
 
-  function toggleNav() {
+  function toggleNav(side) {
     const root = document.documentElement;
     if (isDesktopNav()) {
       const collapsed = root.classList.toggle('nav-collapsed');
       localStorage.setItem('navCollapsed', collapsed);
+    } else if (root.classList.contains('nav-open')) {
+      closeNav();
     } else {
-      root.classList.toggle('nav-open');
+      openNav(side);
     }
   }
 
@@ -194,7 +222,8 @@
       if (startX === null) return;
       const dx = e.changedTouches[0].clientX - startX;
       const dy = e.changedTouches[0].clientY - startY;
-      if (dx < -50 && Math.abs(dx) > Math.abs(dy)) closeNav();
+      const away = document.documentElement.classList.contains('nav-right') ? dx > 50 : dx < -50;
+      if (away && Math.abs(dx) > Math.abs(dy)) closeNav();
       startX = startY = null;
     });
   })();

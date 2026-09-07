@@ -1984,6 +1984,7 @@ _PARTIALS = {
     "{{CHART_MODAL}}": "_chart_modal.html",
     "{{SIDEBAR}}": "_sidebar.html",
     "{{NAV_BUTTON}}": "_nav_button.html",
+    "{{NAV_BUTTON_RIGHT}}": "_nav_button_right.html",
     "{{ACTION_SHEET}}": "_action_sheet.html",
     "{{USER_COLORS}}": "_user_colors.html",
 }
