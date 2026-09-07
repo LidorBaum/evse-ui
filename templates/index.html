@@ -168,8 +168,10 @@
   </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-200">
+  {{SIDEBAR}}
+
   <!-- Error Alert Banner (hidden by default) -->
-  <div id="errorAlert" class="hidden fixed top-0 left-0 right-0 z-50 bg-red-500 text-white px-4 py-3 shadow-lg">
+  <div id="errorAlert" class="sidebar-offset hidden fixed top-0 left-0 right-0 z-50 bg-red-500 text-white px-4 py-3 shadow-lg">
     <div class="max-w-5xl mx-auto flex items-center justify-between">
       <div class="flex items-center gap-2">
         <span class="text-xl">⚠️</span>
@@ -182,20 +184,11 @@
   <!-- Toast Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <!-- Header -->
-  <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors pt-[env(safe-area-inset-top)]">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-      <h1 class="text-xl font-semibold text-gray-900 dark:text-white">MG4 Charger</h1>
-      <div class="flex items-center space-x-2">
-        <button onclick="toggleDarkMode()" id="darkModeBtn" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition" title="Toggle dark mode">
-          <span id="darkModeIcon">
-            <svg class="w-5 h-5 hidden dark:block" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"></path></svg>
-            <svg class="w-5 h-5 block dark:hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
-          </span>
-        </button>
-        <button onclick="location.href='/calculator'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">Amps Calculator</button>
-        <button onclick="location.href='/settings'" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-2 rounded-lg transition">Settings</button>
-      </div>
+  <!-- Top bar -->
+  <header class="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-20 transition-colors pt-[env(safe-area-inset-top)]">
+    <div class="px-4 sm:px-6 lg:px-8 flex items-center gap-3 h-16">
+      {{NAV_BUTTON}}
+      <h1 class="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">Dashboard</h1>
     </div>
   </header>
 
@@ -221,17 +214,17 @@
     <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
       <div class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Max Amps: <span id="ampsVal">N/A</span></div>
       <div id="ampsButtons" class="grid grid-cols-6 sm:grid-cols-11 gap-2">
-        <button type="button" data-amps="6" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">6A</button>
-        <button type="button" data-amps="7" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">7A</button>
-        <button type="button" data-amps="8" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">8A</button>
-        <button type="button" data-amps="9" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">9A</button>
-        <button type="button" data-amps="10" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">10A</button>
-        <button type="button" data-amps="11" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">11A</button>
-        <button type="button" data-amps="12" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">12A</button>
-        <button type="button" data-amps="13" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">13A</button>
-        <button type="button" data-amps="14" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">14A</button>
-        <button type="button" data-amps="15" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">15A</button>
-        <button type="button" data-amps="16" disabled class="amp-btn py-2 px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">16A</button>
+        <button type="button" data-amps="6" disabled class="amp-btn py-2 px-2 sm:px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">6A</button>
+        <button type="button" data-amps="7" disabled class="amp-btn py-2 px-2 sm:px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">7A</button>
+        <button type="button" data-amps="8" disabled class="amp-btn py-2 px-2 sm:px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">8A</button>
+        <button type="button" data-amps="9" disabled class="amp-btn py-2 px-2 sm:px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">9A</button>
+        <button type="button" data-amps="10" disabled class="amp-btn py-2 px-2 sm:px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">10A</button>
+        <button type="button" data-amps="11" disabled class="amp-btn py-2 px-2 sm:px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">11A</button>
+        <button type="button" data-amps="12" disabled class="amp-btn py-2 px-2 sm:px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">12A</button>
+        <button type="button" data-amps="13" disabled class="amp-btn py-2 px-2 sm:px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">13A</button>
+        <button type="button" data-amps="14" disabled class="amp-btn py-2 px-2 sm:px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">14A</button>
+        <button type="button" data-amps="15" disabled class="amp-btn py-2 px-2 sm:px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">15A</button>
+        <button type="button" data-amps="16" disabled class="amp-btn py-2 px-2 sm:px-3 rounded-lg font-medium text-sm border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100 dark:disabled:hover:bg-gray-700 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600 disabled:hover:text-gray-700 dark:disabled:hover:text-gray-300 transition-all">16A</button>
       </div>
     </div>
 
@@ -278,6 +271,10 @@
 
   {{CHART_MODAL}}
 
+  {{ACTION_SHEET}}
+
+  {{USER_COLORS}}
+
   <!-- Session Note Modal -->
   <div id="noteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4 shadow-xl">
@@ -288,6 +285,29 @@
       <div class="flex gap-3 mt-4">
         <button onclick="closeNoteModal()" class="flex-1 py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
         <button onclick="saveNote()" class="flex-1 py-2 px-4 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Neighbour Payment Modal -->
+  <div id="neighborModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md shadow-xl">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">💸 Neighbour Payment</h3>
+      <div id="neighborMeta" class="text-xs text-gray-500 dark:text-gray-400 mb-4"></div>
+      <input type="hidden" id="neighborSessionId" />
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price (₪)</label>
+      <input type="number" id="neighborPrice" step="1" min="0" placeholder="0"
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm mb-3" />
+      <label class="flex items-center gap-2 mb-3 cursor-pointer select-none">
+        <input type="checkbox" id="neighborPaid" class="rounded border-gray-300 dark:border-gray-600 text-emerald-500 focus:ring-emerald-500" />
+        <span class="text-sm text-gray-700 dark:text-gray-300">Paid</span>
+      </label>
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment note <span class="text-gray-400">(optional)</span></label>
+      <input type="text" id="neighborPaymentNote" placeholder="e.g., Bit, Cash, Bank transfer"
+        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 px-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:border-emerald-500 focus:ring-emerald-500 text-sm mb-4" />
+      <div class="flex gap-3">
+        <button onclick="closeNeighborModal()" class="flex-1 py-2 px-4 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">Cancel</button>
+        <button onclick="saveNeighbor()" class="flex-1 py-2 px-4 rounded-lg font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition">Save</button>
       </div>
     </div>
   </div>
@@ -392,12 +412,7 @@ function initDarkMode() {
   else document.documentElement.classList.remove('dark');
 }
 
-function toggleDarkMode() {
-  const isDark = document.documentElement.classList.toggle('dark');
-  localStorage.setItem('darkMode', isDark);
-}
-
-initDarkMode();
+initDarkMode();  // toggleDarkMode() lives in the shared sidebar partial
 
 // Notifications
 async function requestNotificationPermission() {
@@ -711,28 +726,70 @@ function fmtSession(s){
 
   const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
   const note = (s.meta && s.meta.note) ? s.meta.note : '';
+  const neighborPrice = (s.meta && s.meta.neighbor_price != null) ? s.meta.neighbor_price : null;
+  const neighborPaid = !!(s.meta && s.meta.neighbor_paid);
+  const neighborPill = neighborPrice != null
+    ? `<span onclick="openNeighborModal('${s.id}')" class="cursor-pointer text-xs px-2 py-0.5 rounded-full font-medium ${neighborPaid ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'}" title="${neighborPaid ? 'Paid' : 'Unpaid'}">₪${Math.round(Number(neighborPrice))}${neighborPaid ? ' ✓' : ''}</span>`
+    : '';
 
-  return `<div class="py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 flex items-center gap-3">
-    <div class="flex-1">
-      <div class="flex items-center gap-2 flex-wrap">
-        <span class="font-bold text-gray-900 dark:text-white">${energy}</span>
-        <span class="text-emerald-600 dark:text-emerald-400 font-medium">(+${batteryPct}%)</span>
-        <span class="text-gray-500 dark:text-gray-500">·</span>
-        <span class="text-gray-600 dark:text-gray-400">${cost}</span>
-        <span class="text-gray-500 dark:text-gray-500">·</span>
-        <span class="text-gray-600 dark:text-gray-400">${user}</span>
-        ${ongoing ? '<span class="text-emerald-500">🔌</span>' : ''}
-        ${note ? `<span class="text-gray-500 dark:text-gray-500">·</span><span class="text-amber-600 dark:text-amber-400 italic text-sm">${note}</span>` : ''}
+  const q = (t) => String(t).replace(/'/g, "\\'");
+
+  const pills = [
+    userChip(user),
+    ongoing ? '<span class="pill bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">🔌 Charging</span>' : '',
+    neighborPill,
+  ].filter(Boolean).join('');
+
+  // Desktop keeps the icon row; mobile collapses it into one action sheet button.
+  const icons = [
+    `<button onclick="openUserModal('${s.id}', '${q(user)}')" class="icon-btn text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400" title="Switch user"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></button>`,
+    `<button onclick="openNoteModal('${s.id}')" class="icon-btn text-gray-400 dark:text-gray-500 hover:text-emerald-500 dark:hover:text-emerald-400" title="${note || 'Add note'}"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>`,
+    !ongoing ? `<button onclick="openNeighborModal('${s.id}')" class="icon-btn text-gray-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400 font-semibold" title="${neighborPrice != null ? 'Edit neighbour payment' : 'Set neighbour payment'}">₪</button>` : '',
+  ].filter(Boolean).join('');
+
+  return `<div class="py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
+    <div class="flex items-start gap-2">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-x-2 gap-y-1.5 flex-wrap">
+          <span class="font-bold text-gray-900 dark:text-white">${energy}</span>
+          <span class="text-emerald-600 dark:text-emerald-400 font-medium text-sm">+${batteryPct}%</span>
+          <span class="text-gray-600 dark:text-gray-400">${cost}</span>
+          ${pills}
+        </div>
+        <div class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">${start} → ${end}</div>
+        ${note ? `<div class="mt-1 text-sm italic text-amber-600 dark:text-amber-400 break-words">${note}</div>` : ''}
       </div>
-      <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">${start} → ${end}</div>
+      <div class="hidden sm:flex items-center gap-0.5 flex-shrink-0">${icons}</div>
+      <button onclick="openSessionSheet('${s.id}')" class="icon-btn icon-btn-dots only-mobile text-gray-500 dark:text-gray-400" title="Actions" aria-label="Session actions"><svg fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.1"/><circle cx="12" cy="12" r="2.1"/><circle cx="12" cy="19" r="2.1"/></svg></button>
     </div>
-    <button onclick="openUserModal('${s.id}', '${user.replace(/'/g, "\\'")}')" class="text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 px-2 transition" title="Switch user">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-    </button>
-    <button onclick="openNoteModal('${s.id}')" class="text-gray-400 dark:text-gray-500 hover:text-emerald-500 dark:hover:text-emerald-400 px-2 transition" title="${note || 'Add note'}">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-    </button>
   </div>`;
+}
+
+// Mobile: row actions in one reachable sheet
+function openSessionSheet(sessionId) {
+  const s = recentSessions.find(x => x.id === sessionId);
+  if (!s) return;
+  const ongoing = !s.ended_at;
+  const user = (s.meta && s.meta.user) ? s.meta.user : 'Unknown';
+  const note = (s.meta && s.meta.note) ? s.meta.note : '';
+  const price = (s.meta && s.meta.neighbor_price != null) ? s.meta.neighbor_price : null;
+
+  let energyVal = 0;
+  if (s.session_energy_kwh != null) {
+    energyVal = s.session_energy_kwh;
+  } else if (s.end_amount_kwh != null && s.start_amount_kwh != null) {
+    energyVal = s.end_amount_kwh - s.start_amount_kwh;
+  }
+
+  openActionSheet({
+    title: energyVal.toFixed(1) + ' kWh · ₪' + calcSessionCost(energyVal, s.started_at, s.ended_at).toFixed(2),
+    subtitle: fmtDate(s.started_at) + ' → ' + (ongoing ? 'ongoing' : fmtDate(s.ended_at)),
+    actions: [
+      { label: 'Switch user', hint: user, icon: '<svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>', run: () => openUserModal(s.id, user) },
+      { label: note ? 'Edit note' : 'Add note', hint: note || undefined, icon: '<svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>', run: () => openNoteModal(s.id) },
+      !ongoing && { label: price != null ? 'Edit neighbour payment' : 'Set neighbour payment', hint: price != null ? '₪' + Math.round(Number(price)) : undefined, icon: '<svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.5 8.5h19v9a1.5 1.5 0 01-1.5 1.5H4a1.5 1.5 0 01-1.5-1.5v-9zM2.5 8.5l2-3.5h15l2 3.5M16 14h2"/></svg>', run: () => openNeighborModal(s.id) },
+    ],
+  });
 }
 
 // Note Modal
@@ -790,8 +847,92 @@ async function loadSessions(){
       if (s.meta && s.meta.note) sessionNotes[s.id] = s.meta.note;
     });
     const recent = list.slice(0, 10);
+    recentSessions = recent;
     el.innerHTML = recent.map(fmtSession).join('');
   }catch(e){}
+}
+
+let recentSessions = [];
+
+// Neighbour Payment modal
+let neighborRateByUser = null;
+
+async function ensureNeighborRates() {
+  if (neighborRateByUser !== null) return;
+  try {
+    const r = await fetch('/api/payments/summary');
+    if (!r.ok) { neighborRateByUser = {}; return; }
+    const data = await r.json();
+    const map = {};
+    (data.groups || []).forEach(g => {
+      if (g.last_rate_per_kwh != null) map[g.user] = g.last_rate_per_kwh;
+    });
+    neighborRateByUser = map;
+  } catch(e) { neighborRateByUser = {}; }
+}
+
+async function openNeighborModal(sessionId) {
+  const s = recentSessions.find(x => x.id === sessionId);
+  if (!s) return;
+  const meta = s.meta || {};
+  let energyVal = 0;
+  if (s.session_energy_kwh != null) energyVal = s.session_energy_kwh;
+  else if (s.end_amount_kwh != null && s.start_amount_kwh != null) energyVal = s.end_amount_kwh - s.start_amount_kwh;
+  const systemCost = calcSessionCost(energyVal, s.started_at, s.ended_at);
+  const user = meta.user || 'Unknown';
+
+  document.getElementById('neighborSessionId').value = sessionId;
+  document.getElementById('neighborMeta').textContent =
+    `${user} · ${energyVal.toFixed(1)} kWh · system cost ₪${systemCost.toFixed(2)}`;
+
+  let price;
+  if (meta.neighbor_price != null) {
+    price = meta.neighbor_price;
+  } else {
+    await ensureNeighborRates();
+    const rate = neighborRateByUser && neighborRateByUser[user];
+    price = (rate != null && energyVal > 0) ? Math.ceil(rate * energyVal) : Math.ceil(systemCost);
+  }
+  document.getElementById('neighborPrice').value = price;
+  document.getElementById('neighborPaid').checked = !!meta.neighbor_paid;
+  document.getElementById('neighborPaymentNote').value = meta.neighbor_payment_note || '';
+  document.getElementById('neighborModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('neighborPrice').focus(), 50);
+}
+
+function closeNeighborModal() {
+  document.getElementById('neighborModal').classList.add('hidden');
+}
+
+async function saveNeighbor() {
+  const sid = document.getElementById('neighborSessionId').value;
+  const priceRaw = document.getElementById('neighborPrice').value;
+  if (priceRaw === '' || isNaN(parseFloat(priceRaw))) {
+    alert('Enter a valid price');
+    return;
+  }
+  const body = {
+    price: parseFloat(priceRaw),
+    paid: document.getElementById('neighborPaid').checked,
+    payment_note: document.getElementById('neighborPaymentNote').value.trim(),
+  };
+  try {
+    const r = await fetch('/api/session/' + sid + '/neighbor', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    if (data.ok) {
+      neighborRateByUser = null;
+      closeNeighborModal();
+      loadSessions();
+    } else {
+      alert(data.error || 'Failed to save');
+    }
+  } catch(e) {
+    alert('Failed to save: ' + e.message);
+  }
 }
 
 function openLiveChart(){
@@ -958,6 +1099,8 @@ async function loadSettings(){
     clockDiscountPercent = settings.clock_discount_percent ?? 20;
     batteryCapacity = settings.battery_capacity_kwh || 64;
     window.batteryCapacity = batteryCapacity;
+
+    setUserColors(settings.user_colors);
 
     const users = settings.users || ['Lidor', 'Bar'];
     availableUsers = users;

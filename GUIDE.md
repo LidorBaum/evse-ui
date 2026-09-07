@@ -699,7 +699,7 @@ Toggle between light and dark themes (persists across sessions)
 
 ### Daily Backup
 
-Sessions are automatically backed up to Telegram daily at 10:00 AM (if configured via cron).
+Sessions, payments & settings are automatically backed up to Telegram daily at 10:00 AM (if configured via cron). Each file is sent only when it changed since the last send.
 
 ---
 

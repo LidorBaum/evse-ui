@@ -1,0 +1,62 @@
+<!-- ==== Per-user chip colours (shared partial) ==== -->
+<!-- Colour per user comes from settings.user_colors; plain CSS so it does not
+     depend on Tailwind generating classes for runtime-inserted markup. -->
+<style>
+  .udot { display: inline-block; width: .625rem; height: .625rem; border-radius: 9999px; flex-shrink: 0; }
+
+  .chip-slate   { background: #e2e8f0; color: #334155; }
+  .chip-emerald { background: #d1fae5; color: #047857; }
+  .chip-blue    { background: #dbeafe; color: #1d4ed8; }
+  .chip-violet  { background: #ede9fe; color: #6d28d9; }
+  .chip-amber   { background: #fef3c7; color: #b45309; }
+  .chip-rose    { background: #ffe4e6; color: #be123c; }
+  .chip-cyan    { background: #cffafe; color: #0e7490; }
+  .chip-lime    { background: #ecfccb; color: #4d7c0f; }
+  .chip-orange  { background: #ffedd5; color: #c2410c; }
+  .chip-pink    { background: #fce7f3; color: #be185d; }
+
+  .dark .chip-slate   { background: rgba(148, 163, 184, .18); color: #cbd5e1; }
+  .dark .chip-emerald { background: rgba(16, 185, 129, .18);  color: #6ee7b7; }
+  .dark .chip-blue    { background: rgba(59, 130, 246, .2);   color: #93c5fd; }
+  .dark .chip-violet  { background: rgba(139, 92, 246, .2);   color: #c4b5fd; }
+  .dark .chip-amber   { background: rgba(245, 158, 11, .2);   color: #fcd34d; }
+  .dark .chip-rose    { background: rgba(244, 63, 94, .2);    color: #fda4af; }
+  .dark .chip-cyan    { background: rgba(6, 182, 212, .2);    color: #67e8f9; }
+  .dark .chip-lime    { background: rgba(132, 204, 22, .2);   color: #bef264; }
+  .dark .chip-orange  { background: rgba(249, 115, 22, .2);   color: #fdba74; }
+  .dark .chip-pink    { background: rgba(236, 72, 153, .2);   color: #f9a8d4; }
+
+  /* Solid version, for dots and swatches - translucent chip fills read as mud on a small dot */
+  .dot-slate   { background: #94a3b8; }
+  .dot-emerald { background: #10b981; }
+  .dot-blue    { background: #3b82f6; }
+  .dot-violet  { background: #8b5cf6; }
+  .dot-amber   { background: #f59e0b; }
+  .dot-rose    { background: #f43f5e; }
+  .dot-cyan    { background: #06b6d4; }
+  .dot-lime    { background: #84cc16; }
+  .dot-orange  { background: #f97316; }
+  .dot-pink    { background: #ec4899; }
+</style>
+
+<script>
+  const USER_COLOR_KEYS = ['slate', 'emerald', 'blue', 'violet', 'amber', 'rose', 'cyan', 'lime', 'orange', 'pink'];
+  let userColorMap = {};
+
+  function setUserColors(map) {
+    userColorMap = (map && typeof map === 'object') ? map : {};
+  }
+
+  function userColorKey(user) {
+    const key = userColorMap[user];
+    return USER_COLOR_KEYS.includes(key) ? key : 'slate';
+  }
+
+  function userChip(user, extraClass) {
+    return `<span class="pill chip-${userColorKey(user)} ${extraClass || ''}">${user}</span>`;
+  }
+
+  function userDot(user) {
+    return `<span class="udot dot-${userColorKey(user)}" title="${user}"></span>`;
+  }
+</script>
