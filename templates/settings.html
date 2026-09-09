@@ -126,14 +126,25 @@
     <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm mb-4 transition-colors">
       <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Telegram Notifications</h2>
       <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Get notified when charging starts, ends, or errors occur</p>
+      <label class="mt-4 flex items-start justify-between gap-4 cursor-pointer select-none">
+        <span>
+          <span class="block text-sm font-medium text-gray-900 dark:text-white">Enable Telegram messages</span>
+          <span id="telegramEnabledHelp" class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">Turn off to stop all messages, bot replies, exports, and daily backups. Click Save Settings to apply.</span>
+        </span>
+        <span class="relative inline-flex shrink-0 mt-1">
+          <input type="checkbox" id="telegramEnabled" role="switch" aria-describedby="telegramEnabledHelp" checked onchange="updateTelegramControls()" class="peer sr-only" />
+          <span aria-hidden="true" class="w-11 h-6 rounded-full bg-gray-300 dark:bg-gray-600 peer-checked:bg-emerald-500 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-500 peer-focus-visible:ring-offset-2 dark:peer-focus-visible:ring-offset-gray-800 transition-colors"></span>
+          <span aria-hidden="true" class="absolute left-0.5 top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"></span>
+        </span>
+      </label>
       <label class="mt-4 flex items-start gap-3 cursor-pointer select-none">
-        <input type="checkbox" id="telegramNotifyServiceUp" class="mt-1 rounded border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-emerald-500" />
+        <input type="checkbox" id="telegramNotifyServiceUp" data-telegram-control class="mt-1 rounded border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed" />
         <span>
           <span class="block text-sm font-medium text-gray-900 dark:text-white">Notify when service starts</span>
           <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">Send a Telegram message after each restart or reboot (so you know the Pi is back online)</span>
         </span>
       </label>
-      <button onclick="testTelegram(this)" class="mt-3 w-full py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer">Send Test Message 📬</button>
+      <button onclick="testTelegram(this)" data-telegram-control class="mt-3 w-full py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">Send Test Message 📬</button>
       <p class="text-sm mt-2" id="telegramNote"></p>
     </div>
 
@@ -142,8 +153,8 @@
       <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Export Data</h2>
       <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Send your data files via Telegram</p>
       <div class="grid grid-cols-2 gap-3 mt-3">
-        <button onclick="sendSessions(this)" class="py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer">Send Sessions</button>
-        <button onclick="sendSettings(this)" class="py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer">Send Settings</button>
+        <button onclick="sendSessions(this)" data-telegram-control class="py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">Send Sessions</button>
+        <button onclick="sendSettings(this)" data-telegram-control class="py-3 px-4 rounded-xl font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">Send Settings</button>
       </div>
       <p class="text-sm mt-2" id="exportNote"></p>
     </div>
@@ -196,6 +207,13 @@ function renderUserColors() {
   setUserColors(pendingUserColors);
 }
 
+function updateTelegramControls() {
+  const enabled = document.getElementById('telegramEnabled').checked;
+  document.querySelectorAll('[data-telegram-control]').forEach(control => {
+    control.disabled = !enabled || control.classList.contains('btn-loading');
+  });
+}
+
 async function loadSettings(){
   try {
     const r = await fetch('/api/settings');
@@ -209,7 +227,9 @@ async function loadSettings(){
     document.getElementById('pricePerKwh').value = s.price_per_kwh;
     document.getElementById('clockDiscount').value = s.clock_discount_percent ?? 20;
     document.getElementById('batteryCapacity').value = s.battery_capacity_kwh || 64;
+    document.getElementById('telegramEnabled').checked = s.telegram_enabled !== false;
     document.getElementById('telegramNotifyServiceUp').checked = s.telegram_notify_service_up !== false;
+    updateTelegramControls();
     renderUserColors();
   } catch(e) {}
 }
@@ -273,7 +293,7 @@ async function testTelegram(btn){
   }
   
   btn.classList.remove('btn-loading');
-  btn.disabled = false;
+  updateTelegramControls();
 }
 
 async function saveSettings(){
@@ -301,6 +321,7 @@ async function saveSettings(){
         price_per_kwh: pricePerKwh,
         clock_discount_percent: clockDiscount,
         battery_capacity_kwh: batteryCapacity,
+        telegram_enabled: document.getElementById('telegramEnabled').checked,
         telegram_notify_service_up: document.getElementById('telegramNotifyServiceUp').checked
       })
     });
@@ -339,7 +360,7 @@ async function sendSessions(btn) {
   }
   
   btn.classList.remove('btn-loading');
-  btn.disabled = false;
+  updateTelegramControls();
 }
 
 async function sendSettings(btn) {
@@ -365,7 +386,7 @@ async function sendSettings(btn) {
   }
   
   btn.classList.remove('btn-loading');
-  btn.disabled = false;
+  updateTelegramControls();
 }
 
 loadSettings();
