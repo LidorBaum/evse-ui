@@ -16,6 +16,7 @@ Cron example (daily at 10:00 Jerusalem time):
 """
 
 import hashlib
+import json
 import os
 import urllib.request
 from pathlib import Path
@@ -39,6 +40,18 @@ BACKUP_FILES = [
     (PAYMENTS_FILE, "💸 Daily payments backup", script_dir / ".payments_sent_hash"),
     (SETTINGS_FILE, "⚙️ Daily settings backup", script_dir / ".settings_sent_hash"),
 ]
+
+
+def telegram_enabled() -> bool:
+    """Read the saved preference on each send, including standalone cron runs."""
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f).get("telegram_enabled", True)
+    except FileNotFoundError:
+        return True
+    except (OSError, ValueError, AttributeError) as e:
+        print(f"Cannot read Telegram setting; skipping backups: {e}")
+        return False
 
 
 def get_file_hash(file_path: str) -> str:
@@ -68,6 +81,8 @@ def has_file_changed(file_path: str, cache_file: Path) -> bool:
 
 def send_telegram_file(file_path: str, caption: str = "", silent: bool = True) -> tuple[bool, str]:
     """Send a file via Telegram bot."""
+    if not telegram_enabled():
+        return False, "Telegram messages are disabled in Settings"
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return False, "Telegram not configured (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID)"
 
@@ -115,6 +130,8 @@ def send_telegram_file(file_path: str, caption: str = "", silent: bool = True) -
             data=body.encode('utf-8'),
             headers={'Content-Type': f'multipart/form-data; boundary={boundary}'}
         )
+        if not telegram_enabled():
+            return False, "Telegram messages are disabled in Settings"
         urllib.request.urlopen(req, timeout=30)
         return True, "File sent successfully"
     except Exception as e:
@@ -128,6 +145,10 @@ if __name__ == "__main__":
     force_send = "--force" in sys.argv
 
     print(f"[{datetime.now().isoformat()}] Checking data-file backups...")
+
+    if not telegram_enabled():
+        print("Telegram messages are disabled; skipping backups.")
+        sys.exit(0)
 
     any_failed = False
     for file_path, caption, cache_file in BACKUP_FILES:

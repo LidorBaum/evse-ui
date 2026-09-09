@@ -685,10 +685,12 @@ Configure your preferences:
 - **Price per kWh** - Electricity rate for cost calculation
 - **Battery Capacity** - Your car's battery size (for calculations)
 - **Bluetooth Control** - Pause BLE to connect with phone app
-- **Telegram** - Test notifications
+- **Telegram** - Enable or disable all Telegram messages and test notifications
 - **Export Data** - Send sessions/settings to Telegram
 
 #### 📱 Telegram Notifications
+Turn off **Enable Telegram messages** in Settings and click **Save Settings** to stop all Telegram messages, including alerts, bot replies, test messages, exports, and daily backups. The preference survives restarts. Turn it back on and save to resume sending.
+
 Get notified when:
 - ⚡ Charging starts
 - ✅ Charging completes (with energy, cost, battery %)

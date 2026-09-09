@@ -91,8 +91,14 @@ SESSIONS_PRE_MIGRATION_BACKUP = os.getenv(
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
+def _telegram_enabled() -> bool:
+    return app_settings.get("telegram_enabled", True)
+
+
 def _send_telegram(message: str, silent: bool = False, reply_markup: dict | None = None):
     """Send a message via Telegram bot (non-blocking)."""
+    if not _telegram_enabled():
+        return
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
 
@@ -111,6 +117,8 @@ def _send_telegram(message: str, silent: bool = False, reply_markup: dict | None
                 data_dict["reply_markup"] = reply_markup
             payload = json.dumps(data_dict).encode()
             req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+            if not _telegram_enabled():
+                return
             urllib.request.urlopen(req, timeout=10)
         except Exception as e:
             print(f"Telegram error: {e}")
@@ -221,6 +229,7 @@ def _load_settings() -> dict:
         "price_per_kwh": 0.64,
         "clock_discount_percent": 20,  # 20% off during clock hours
         "battery_capacity_kwh": 64.0,  # MG4 default
+        "telegram_enabled": True,
         "telegram_notify_service_up": True,
     }
     needs_save = False
@@ -272,7 +281,7 @@ def _get_local_ip() -> str:
 
 @app.on_event("startup")
 async def _notify_telegram_service_up():
-    if not app_settings.get("telegram_notify_service_up", True):
+    if not _telegram_enabled() or not app_settings.get("telegram_notify_service_up", True):
         return
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
@@ -903,6 +912,8 @@ def health():
 @app.post("/api/watchdog/alert")
 def api_watchdog_alert(body: dict):
     """Relay a watchdog event to Telegram. Intended for local scripts only."""
+    if not _telegram_enabled():
+        return {"ok": False, "error": "Telegram messages are disabled in Settings"}
     message = (body.get("message") or "").strip()
     if not message:
         return {"ok": False, "error": "message required"}
@@ -1554,6 +1565,8 @@ def api_post_settings(new_settings: dict):
             app_settings["clock_discount_percent"] = int(new_settings["clock_discount_percent"])
         except (TypeError, ValueError):
             pass
+    if "telegram_enabled" in new_settings:
+        app_settings["telegram_enabled"] = bool(new_settings["telegram_enabled"])
     if "telegram_notify_service_up" in new_settings:
         app_settings["telegram_notify_service_up"] = bool(new_settings["telegram_notify_service_up"])
     _save_settings(app_settings)
@@ -1590,6 +1603,8 @@ def api_restart_ble():
 @app.post("/api/telegram/test")
 def api_telegram_test():
     """Send a test message to Telegram."""
+    if not _telegram_enabled():
+        return {"ok": False, "error": "Telegram messages are disabled in Settings"}
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return {"ok": False, "error": "Telegram not configured"}
     
@@ -1611,6 +1626,8 @@ def api_telegram_test():
 
 def _send_telegram_file(file_path: str, caption: str = "", silent: bool = True):
     """Send a file via Telegram bot (blocking). Silent mode disables notification sound."""
+    if not _telegram_enabled():
+        return False, "Telegram messages are disabled in Settings"
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return False, "Telegram not configured"
     
@@ -1658,6 +1675,8 @@ def _send_telegram_file(file_path: str, caption: str = "", silent: bool = True):
             data=body.encode('utf-8'),
             headers={'Content-Type': f'multipart/form-data; boundary={boundary}'}
         )
+        if not _telegram_enabled():
+            return False, "Telegram messages are disabled in Settings"
         urllib.request.urlopen(req, timeout=30)
         return True, "File sent successfully"
     except Exception as e:
@@ -1823,6 +1842,10 @@ def _telegram_poll_loop():
                 update_id = update.get("update_id", 0)
                 offset = max(offset, update_id + 1)
 
+                # Consume muted commands so they are not replayed when re-enabled.
+                if not _telegram_enabled():
+                    continue
+
                 # Handle inline button presses
                 callback = update.get("callback_query")
                 if callback:
@@ -1907,6 +1930,8 @@ if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
 @app.post("/api/telegram/send-sessions")
 def api_telegram_send_sessions():
     """Send sessions.json via Telegram."""
+    if not _telegram_enabled():
+        return {"ok": False, "error": "Telegram messages are disabled in Settings"}
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return {"ok": False, "error": "Telegram not configured"}
     
@@ -1920,6 +1945,8 @@ def api_telegram_send_sessions():
 @app.post("/api/telegram/send-settings")
 def api_telegram_send_settings():
     """Send settings.json via Telegram."""
+    if not _telegram_enabled():
+        return {"ok": False, "error": "Telegram messages are disabled in Settings"}
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return {"ok": False, "error": "Telegram not configured"}
     
@@ -1933,6 +1960,8 @@ def api_telegram_send_settings():
 @app.post("/api/telegram/send-payments")
 def api_telegram_send_payments():
     """Send payments.json via Telegram."""
+    if not _telegram_enabled():
+        return {"ok": False, "error": "Telegram messages are disabled in Settings"}
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return {"ok": False, "error": "Telegram not configured"}
 
